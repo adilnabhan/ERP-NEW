@@ -1,67 +1,191 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Users, Bed, Stethoscope, Activity } from 'lucide-react';
+import { Users, Bed, Stethoscope, Activity, TrendingUp, Calendar, Download, CheckCircle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
 
-async function getDashboardData() {
-  const [patientsCount, roomsAvailable, doctorsActive, todayAdmissions] = await Promise.all([
-    supabase.from('patients').select('id', { count: 'exact', head: true }),
-    supabase.from('rooms').select('id', { count: 'exact', head: true }).eq('status', 'Available'),
-    supabase.from('doctors').select('id', { count: 'exact', head: true }).eq('status', 'Available'),
-    supabase.from('patients').select('id', { count: 'exact', head: true }).gte('admission_date', new Date().toISOString().split('T')[0]),
-  ]);
+export default function Dashboard() {
+  const [stats, setStats] = useState({ patients: 0, rooms: 0, doctors: 0, admissions: 0 });
+  const [revenue, setRevenue] = useState({ today: 0, month: 0, total: 0 });
+  const [dailyData, setDailyData] = useState<any[]>([]);
+  const [activePatients, setActivePatients] = useState<any[]>([]);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
 
-  return {
-    patients: patientsCount.count || 0,
-    roomsAvailable: roomsAvailable.count || 0,
-    doctorsActive: doctorsActive.count || 0,
-    todayAdmissions: todayAdmissions.count || 0,
-  };
-}
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-export default async function Dashboard() {
-  const data = await getDashboardData();
+  async function fetchDashboardData() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Fetch counts
+    const [pRes, rRes, dRes, aRes] = await Promise.all([
+      supabase.from('patients').select('id', { count: 'exact' }),
+      supabase.from('rooms').select('id', { count: 'exact' }).eq('status', 'Available'),
+      supabase.from('doctors').select('id', { count: 'exact' }).eq('status', 'Available'),
+      supabase.from('patients').select('id', { count: 'exact' }).gte('admission_date', todayStr),
+    ]);
 
-  const stats = [
-    { name: 'Total Patients', value: data.patients, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { name: 'Available Rooms', value: data.roomsAvailable, icon: Bed, color: 'text-green-600', bg: 'bg-green-50' },
-    { name: 'Available Doctors', value: data.doctorsActive, icon: Stethoscope, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { name: 'Admissions Today', value: data.todayAdmissions, icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50' },
-  ];
+    setStats({
+      patients: pRes.count || 0,
+      rooms: rRes.count || 0,
+      doctors: dRes.count || 0,
+      admissions: aRes.count || 0,
+    });
+
+    // Fetch payments for Revenue
+    const { data: payments } = await supabase.from('payments').select('*');
+    if (payments) {
+      setAllPayments(payments);
+      calculateRevenue(payments);
+    }
+
+    // Fetch active patients with billing
+    const { data: activePats } = await supabase.from('patients').select('*, rooms(room_number), doctors(name), billing(*)').eq('status', 'Admitted').order('admission_date', { ascending: false }).limit(10);
+    if (activePats) setActivePatients(activePats);
+  }
+
+  function calculateRevenue(payments: any[]) {
+    let t = 0, m = 0, total = 0;
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const todayDate = now.toLocaleDateString();
+
+    const map: Record<string, number> = {};
+
+    payments.forEach(p => {
+      const amt = Number(p.amount) || 0;
+      const d = new Date(p.payment_date);
+      total += amt;
+      if (d.toLocaleDateString() === todayDate) t += amt;
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) m += amt;
+
+      const dateKey = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      map[dateKey] = (map[dateKey] || 0) + amt;
+    });
+
+    setRevenue({ today: t, month: m, total });
+    
+    const chartData = Object.entries(map).slice(0, 7).map(([k, v]) => ({ name: k, Amount: v })).reverse();
+    setDailyData(chartData);
+  }
+
+  async function quickDischarge(patient: any) {
+    if (!confirm(`Are you sure you want to discharge ${patient.name}?`)) return;
+    
+    await supabase.from('patients').update({
+      status: 'Discharged',
+      discharge_date: new Date().toISOString()
+    }).eq('id', patient.id);
+    
+    if (patient.room_id) {
+       await supabase.from('rooms').update({ status: 'Available' }).eq('id', patient.room_id);
+    }
+    
+    alert(`Patient ${patient.name} Discharged Successfully`);
+    fetchDashboardData();
+  }
+
+  function exportRevenueExcel() {
+    let csv = 'Payment ID,Date,Amount,Method,Type\n';
+    allPayments.forEach(p => {
+      csv += `${p.id},"${new Date(p.payment_date).toLocaleString()}",${p.amount},${p.method || 'Cash'},${p.payment_type}\n`;
+    });
+    
+    csv += `\n--- Automated Revenue Summary ---\n`;
+    csv += `Today's Date,${new Date().toLocaleDateString()}\n`;
+    csv += `Today's Revenue,${revenue.today}\n`;
+    csv += `This Month's Revenue,${revenue.month}\n`;
+    csv += `Total All Time,${revenue.total}\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Live_Revenue_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Dashboard Overview</h1>
-        <div className="text-sm text-gray-500">
-          Last updated: {new Date().toLocaleTimeString()}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Dashboard & Revenue Overview</h1>
+        <div className="flex gap-3">
+           <button onClick={exportRevenueExcel} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm text-sm font-medium">
+             <Download className="w-4 h-4 mr-2" /> Export Revenue Excel
+           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((item) => {
-          const Icon = item.icon;
-          return (
-            <div key={item.name} className="relative overflow-hidden rounded-xl bg-white p-6 shadow-sm border border-gray-100 flex items-center space-x-4 hover:shadow-md transition-shadow">
-              <div className={`p-4 rounded-full ${item.bg}`}>
-                <Icon className={`h-8 w-8 ${item.color}`} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 truncate">{item.name}</p>
-                <p className="text-2xl font-semibold text-gray-900">{item.value}</p>
-              </div>
-            </div>
-          );
-        })}
+      {/* Primary Stats */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-full"><Users className="h-6 w-6" /></div>
+          <div><p className="text-sm font-medium text-gray-500">Total Patients</p><p className="text-2xl font-bold text-gray-900">{stats.patients}</p></div>
+        </div>
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+          <div className="p-3 bg-green-50 text-green-600 rounded-full"><Bed className="h-6 w-6" /></div>
+          <div><p className="text-sm font-medium text-gray-500">Available Rooms</p><p className="text-2xl font-bold text-gray-900">{stats.rooms}</p></div>
+        </div>
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-full"><Calendar className="h-6 w-6" /></div>
+          <div><p className="text-sm font-medium text-gray-500">Today's Revenue</p><p className="text-2xl font-bold text-gray-900">₹{revenue.today.toLocaleString()}</p></div>
+        </div>
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-full"><TrendingUp className="h-6 w-6" /></div>
+          <div><p className="text-sm font-medium text-gray-500">Monthly Revenue</p><p className="text-2xl font-bold text-gray-900">₹{revenue.month.toLocaleString()}</p></div>
+        </div>
       </div>
 
-      {/* Quick Actions / Recent Activity could go here */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center min-h-[300px] text-gray-400">
-          <Activity className="h-10 w-10 mb-4 opacity-20" />
-          <p>Recent Activity Chart (Placeholder)</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Graphical View */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm lg:col-span-2">
+          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center"><Activity className="w-5 h-5 mr-2 text-blue-500"/> Revenue Trend (Graphical View)</h2>
+          <div className="h-72 w-full">
+            {dailyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} tickFormatter={(v) => `₹${v}`} />
+                  <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                  <Area type="monotone" dataKey="Amount" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorAmt)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-gray-400">Loading graphical data...</div>
+            )}
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center min-h-[300px] text-gray-400">
-          <Users className="h-10 w-10 mb-4 opacity-20" />
-          <p>Patient Demographics (Placeholder)</p>
+
+        {/* Quick Active Patients & Discharge */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center"><CheckCircle className="w-5 h-5 mr-2 text-green-500"/> Current Admitted Patients</h2>
+          <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+             {activePatients.length === 0 && <p className="text-sm text-gray-400 italic">No patients currently admitted.</p>}
+             {activePatients.map(p => (
+                <div key={p.id} className="p-3 border border-gray-100 bg-gray-50 rounded-lg flex items-center justify-between">
+                   <div>
+                      <p className="font-semibold text-gray-800 text-sm">{p.name}</p>
+                      <p className="text-xs text-gray-500">{p.rooms?.room_number ? `Room: ${p.rooms.room_number}` : 'No Room'}</p>
+                   </div>
+                   <button 
+                     onClick={() => quickDischarge(p)}
+                     className="px-3 py-1.5 bg-white border border-red-200 text-red-600 font-medium text-xs rounded hover:bg-red-50 hover:border-red-300 transition-colors shadow-sm"
+                   >
+                     Discharge
+                   </button>
+                </div>
+             ))}
+          </div>
         </div>
       </div>
     </div>
