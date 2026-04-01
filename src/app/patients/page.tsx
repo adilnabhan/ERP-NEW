@@ -442,6 +442,9 @@ export default function PatientsPage() {
                        <FileText className="w-4 h-4 mr-2"/> Discharge Patient & Close
                      </button>
                    )}
+                   <button onClick={() => window.open(`/invoice/${selectedPatient.id}`, '_blank')} className="mt-3 w-full py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow flex justify-center items-center">
+                     <FileText className="w-4 h-4 mr-2"/> Generate & Print Invoice
+                   </button>
                 </div>
              </div>
           </div>
