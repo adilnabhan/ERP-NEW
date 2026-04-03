@@ -220,7 +220,7 @@ export default function LeadsPage() {
   // Room select dropdown (no occupied label)
   const roomOptions = rooms.map(r => (
     <option key={r.id} value={r.id}>
-      Room {r.room_number} • {r.ac_type || 'Non-AC'} • {r.bed_type || 'Single'} • {r.type}
+      Room {r.room_number} • {r.ac_type || 'Non-AC'} • {r.bed_type || 'Single'}
     </option>
   ));
 
