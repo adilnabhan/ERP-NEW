@@ -54,7 +54,7 @@ export function ClientWrapper({ children }: { children: React.ReactNode }) {
     <div className="flex w-full min-h-screen">
       <Sidebar />
       <main className="flex-1 w-full overflow-y-auto">
-        <div className="px-8 py-8 w-full max-w-7xl mx-auto">
+        <div className="px-4 py-4 md:px-8 md:py-8 w-full max-w-7xl mx-auto pt-16 md:pt-4">
           {children}
         </div>
       </main>
