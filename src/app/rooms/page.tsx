@@ -15,6 +15,7 @@ interface Room {
 
 export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newRoom, setNewRoom] = useState({ room_number: '', type: 'General', ac_type: 'Non-AC', bed_type: 'Single' });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -25,8 +26,10 @@ export default function RoomsPage() {
   }, []);
 
   async function fetchRooms() {
+    setLoading(true);
     const { data } = await supabase.from('rooms').select('*').order('room_number');
     if (data) setRooms(data);
+    setLoading(false);
   }
 
   async function handleAddRoom(e: React.FormEvent) {

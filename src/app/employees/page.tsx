@@ -15,6 +15,7 @@ interface Employee {
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newEmp, setNewEmp] = useState({ name: '', role: '', contact: '', joining_date: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -26,8 +27,10 @@ export default function EmployeesPage() {
   }, []);
 
   async function fetchEmployees() {
+    setLoading(true);
     const { data } = await supabase.from('employees').select('*').order('name');
     if (data) setEmployees(data);
+    setLoading(false);
   }
 
   async function handleAddEmployee(e: React.FormEvent) {

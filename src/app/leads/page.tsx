@@ -29,6 +29,7 @@ interface Lead {
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newLead, setNewLead] = useState<Partial<Lead>>({
     name: '', contact: '', enquiry_details: '', expected_payment: 0,
@@ -38,21 +39,18 @@ export default function LeadsPage() {
   const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   useEffect(() => {
-    fetchLeads();
-    fetchRooms();
+    fetchAllData();
   }, []);
 
-  async function fetchLeads() {
-    const { data } = await supabase
-      .from('leads')
-      .select('*, rooms(id, room_number, type, ac_type, bed_type)')
-      .order('created_at', { ascending: false });
-    if (data) setLeads(data);
-  }
-
-  async function fetchRooms() {
-    const { data } = await supabase.from('rooms').select('*').order('room_number');
-    if (data) setRooms(data);
+  async function fetchAllData() {
+    setLoading(true);
+    const [leadsRes, roomsRes] = await Promise.all([
+      supabase.from('leads').select('*, rooms(id, room_number, type, ac_type, bed_type)').order('created_at', { ascending: false }),
+      supabase.from('rooms').select('*').order('room_number')
+    ]);
+    if (leadsRes.data) setLeads(leadsRes.data);
+    if (roomsRes.data) setRooms(roomsRes.data);
+    setLoading(false);
   }
 
   // Check if a room is already booked for a particular date
@@ -120,7 +118,7 @@ export default function LeadsPage() {
       setIsAdding(false);
       setNewLead({ name: '', contact: '', enquiry_details: '', expected_payment: 0, booking_date: '', room_id: '' });
       setAvailabilityWarning('');
-      fetchLeads();
+      fetchAllData();
     } else {
       alert('Error: ' + error.message);
     }
@@ -156,9 +154,17 @@ export default function LeadsPage() {
           alert('Lead converted! Patient created with room & date from booking.');
         }
       }
-      fetchLeads();
-      fetchRooms();
+      fetchAllData();
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Leads & Enquiries</h1>
+        <div className="text-center py-12 text-gray-500">Loading data...</div>
+      </div>
+    );
   }
 
   return (
