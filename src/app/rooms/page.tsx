@@ -17,7 +17,7 @@ export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newRoom, setNewRoom] = useState({ room_number: '', type: 'General', ac_type: 'Non-AC', bed_type: 'Single' });
+  const [newRoom, setNewRoom] = useState({ room_number: '', ac_type: 'Non-AC', bed_type: 'Single' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Room>>({});
 
@@ -37,7 +37,7 @@ export default function RoomsPage() {
     const { error } = await supabase.from('rooms').insert([{ ...newRoom, status: 'Available' }]);
     if (!error) {
       setIsAdding(false);
-      setNewRoom({ room_number: '', type: 'General', ac_type: 'Non-AC', bed_type: 'Single' });
+      setNewRoom({ room_number: '', ac_type: 'Non-AC', bed_type: 'Single' });
       fetchRooms();
     } else {
       alert('Error adding room: ' + error.message);
@@ -54,14 +54,13 @@ export default function RoomsPage() {
 
   function startEdit(room: Room) {
     setEditingId(room.id);
-    setEditForm({ type: room.type, ac_type: room.ac_type, bed_type: room.bed_type, room_number: room.room_number });
+    setEditForm({ ac_type: room.ac_type, bed_type: room.bed_type, room_number: room.room_number });
   }
 
   async function saveEdit() {
     if (!editingId) return;
     const { error } = await supabase.from('rooms').update({
       room_number: editForm.room_number,
-      type: editForm.type,
       ac_type: editForm.ac_type,
       bed_type: editForm.bed_type
     }).eq('id', editingId);
@@ -126,7 +125,7 @@ export default function RoomsPage() {
       {isAdding && (
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-6">
           <h2 className="text-lg font-medium mb-4 text-gray-900">Add New Room</h2>
-          <form onSubmit={handleAddRoom} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          <form onSubmit={handleAddRoom} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-500 uppercase">Room Number</label>
               <input
@@ -137,19 +136,6 @@ export default function RoomsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-gray-900"
                 placeholder="e.g., 501"
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-500 uppercase">Type</label>
-              <select
-                value={newRoom.type}
-                onChange={(e) => setNewRoom({ ...newRoom, type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-              >
-                <option value="General">General</option>
-                <option value="Private">Private</option>
-                <option value="ICU">ICU</option>
-                <option value="VIP">VIP</option>
-              </select>
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-500 uppercase">AC / Non-AC</label>
@@ -186,7 +172,6 @@ export default function RoomsPage() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room No</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AC / Non-AC</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bed Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -200,16 +185,6 @@ export default function RoomsPage() {
                   {editingId === room.id ? (
                     <input className="border border-gray-300 rounded px-2 py-1 w-20 text-sm" value={editForm.room_number || ''} onChange={e => setEditForm({...editForm, room_number: e.target.value})} />
                   ) : room.room_number}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {editingId === room.id ? (
-                    <select className="border border-gray-300 rounded px-2 py-1 text-sm bg-white" value={editForm.type || ''} onChange={e => setEditForm({...editForm, type: e.target.value})}>
-                      <option value="General">General</option>
-                      <option value="Private">Private</option>
-                      <option value="ICU">ICU</option>
-                      <option value="VIP">VIP</option>
-                    </select>
-                  ) : room.type}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   {editingId === room.id ? (
@@ -269,7 +244,7 @@ export default function RoomsPage() {
             ))}
             {rooms.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                   No rooms found. Add a room to get started.
                 </td>
               </tr>
