@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import { Printer, ArrowLeft, Hospital } from 'lucide-react';
 
+export const runtime = 'edge';
+
 export default function InvoicePage() {
   const { id } = useParams();
   const router = useRouter();
