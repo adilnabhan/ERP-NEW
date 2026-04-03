@@ -18,11 +18,12 @@ export default function Dashboard() {
   async function fetchDashboardData() {
     const todayStr = new Date().toISOString().split('T')[0];
     
-    const [pRes, rRes, dRes, aRes] = await Promise.all([
+    const [pRes, rRes, dRes, aRes, payRes] = await Promise.all([
       supabase.from('patients').select('id', { count: 'exact' }),
       supabase.from('rooms').select('id', { count: 'exact' }).eq('status', 'Available'),
       supabase.from('doctors').select('id', { count: 'exact' }).eq('status', 'Available'),
       supabase.from('patients').select('id', { count: 'exact' }).gte('admission_date', todayStr),
+      supabase.from('payments').select('*'),
     ]);
 
     setStats({
@@ -32,10 +33,9 @@ export default function Dashboard() {
       admissions: aRes.count || 0,
     });
 
-    const { data: payments } = await supabase.from('payments').select('*');
-    if (payments) {
-      setAllPayments(payments);
-      calculateRevenue(payments);
+    if (payRes.data) {
+      setAllPayments(payRes.data);
+      calculateRevenue(payRes.data);
     }
   }
 
