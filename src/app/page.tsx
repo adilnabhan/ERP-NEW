@@ -1,9 +1,36 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { Users, Bed, Activity, TrendingUp, Calendar, Download } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+
+// Lazy-load Recharts for faster initial page load
+const RechartsArea = dynamic(
+  () => import('recharts').then(mod => {
+    const { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = mod;
+    return function ChartComponent({ data }: { data: any[] }) {
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
+            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} tickFormatter={(v) => `₹${v}`} />
+            <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+            <Area type="monotone" dataKey="Amount" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorAmt)" />
+          </AreaChart>
+        </ResponsiveContainer>
+      );
+    };
+  }),
+  { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-gray-400">Loading chart...</div> }
+);
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ patients: 0, rooms: 0, doctors: 0, admissions: 0 });
@@ -96,7 +123,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-full"><Users className="h-6 w-6" /></div>
           <div><p className="text-sm font-medium text-gray-500">Total Patients</p><p className="text-2xl font-bold text-gray-900">{stats.patients}</p></div>
@@ -115,27 +142,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm w-full">
-        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center"><Activity className="w-5 h-5 mr-2 text-blue-500"/> Revenue Trend (Graphical View)</h2>
-        <div className="h-80 w-full">
+      <div className="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm w-full content-auto">
+        <h2 className="text-base md:text-lg font-bold text-gray-900 mb-4 flex items-center"><Activity className="w-5 h-5 mr-2 text-blue-500"/>Revenue Trend</h2>
+        <div className="h-60 md:h-80 w-full">
           {dailyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dailyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} tickFormatter={(v) => `₹${v}`} />
-                <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                <Area type="monotone" dataKey="Amount" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorAmt)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <RechartsArea data={dailyData} />
           ) : (
-            <div className="flex h-full items-center justify-center text-gray-400">Loading graphical data...</div>
+            <div className="flex h-full items-center justify-center text-gray-400">Loading chart data...</div>
           )}
         </div>
       </div>
