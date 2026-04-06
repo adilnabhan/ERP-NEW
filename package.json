@@ -1,16 +1,42 @@
 {
   "name": "erp-new",
   "version": "0.1.0",
+  "description": "Hospital ERP Desktop App",
+  "author": "Vibecoding",
   "private": true,
+  "main": "electron.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron": "electron .",
+    "dist": "electron-builder build --win"
+  },
+  "build": {
+    "appId": "com.yourcompany.erp",
+    "productName": "My ERP System",
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "electron.js",
+      "package.json",
+      "!node_modules"
+    ],
+    "asar": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "adilnabhan",
+        "repo": "ERP-NEW"
+      }
+    ]
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.0",
     "date-fns": "^4.1.0",
+    "electron-updater": "^6.8.3",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",
     "react": "19.2.4",
@@ -22,6 +48,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^41.1.1",
+    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
