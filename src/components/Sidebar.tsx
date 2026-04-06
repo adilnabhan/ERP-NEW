@@ -11,7 +11,6 @@ const navigation = [
   { name: 'Leads (Enquiries)', href: '/leads', icon: PhoneCall },
   { name: 'Patients', href: '/patients', icon: Users },
   { name: 'Discharged Record', href: '/discharged', icon: FileText },
-  { name: 'Treatments', href: '/treatments', icon: Pill },
   { name: 'Packages', href: '/packages', icon: Library },
   { name: 'Rooms', href: '/rooms', icon: Bed },
   { name: 'Billing', href: '/billing', icon: CreditCard },

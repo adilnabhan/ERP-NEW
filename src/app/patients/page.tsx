@@ -31,18 +31,41 @@ export default function PatientsPage() {
     fetchInitData();
   }, []);
 
+  const [packages, setPackages] = useState<any[]>([]);
+  const [prices, setPrices] = useState<any[]>([]);
+
   async function fetchInitData() {
-    const [pRes, dRes, rRes, tRes] = await Promise.all([
+    const [pRes, dRes, rRes, tRes, pkgRes, prcRes] = await Promise.all([
       supabase.from('patients').select('*, doctors(name), rooms(room_number), billing(*)').order('created_at', { ascending: false }),
       supabase.from('doctors').select('*'),
       supabase.from('rooms').select('*'),
-      supabase.from('treatment_catalog').select('*')
+      supabase.from('treatment_catalog').select('*'),
+      supabase.from('packages').select('*').order('duration_days'),
+      supabase.from('room_package_prices').select('*')
     ]);
     
     if (pRes.data) setPatients(pRes.data);
     if (dRes.data) setDoctors(dRes.data);
     if (rRes.data) setRooms(rRes.data);
     if (tRes.data) setTreatmentsCatalog(tRes.data);
+    if (pkgRes.data) setPackages(pkgRes.data);
+    if (prcRes.data) setPrices(prcRes.data);
+  }
+
+  function lookupPrice(roomId: string, pkgId: string): number | null {
+    if (!roomId || !pkgId) return null;
+    const room = rooms.find(r => r.id === roomId);
+    const pkg = packages.find(p => p.id === pkgId);
+    if (!room || !pkg) return null;
+    const priceRow = prices.find(p => p.room_number === room.room_number);
+    if (!priceRow) return null;
+    let priceCol = '';
+    const pkgName = pkg.name.toLowerCase();
+    if (pkgName.includes('sutika')) priceCol = 'sutika_care_price';
+    else if (pkgName.includes('purna shakti')) priceCol = 'purna_shakti_price';
+    else if (pkgName.includes('suvarna 21')) priceCol = 'suvarna_21_price';
+    else if (pkgName.includes('sampurna raksha')) priceCol = 'sampurna_raksha_price';
+    return priceCol && priceRow[priceCol] ? Number(priceRow[priceCol]) : null;
   }
 
   const filteredPatients = patients.filter(p => p.contact?.includes(searchPhone) || p.name?.toLowerCase().includes(searchPhone.toLowerCase()));
@@ -67,6 +90,14 @@ export default function PatientsPage() {
       await supabase.from('billing').insert([{ patient_id: newPat.id }]);
       if (form.room_id) {
          await supabase.from('rooms').update({ status: 'Occupied' }).eq('id', form.room_id);
+      }
+      if (form.room_id && form.package_id) {
+         const pBase = lookupPrice(form.room_id, form.package_id);
+         if (pBase !== null) {
+             await supabase.from('patient_treatments').insert([
+               { patient_id: newPat.id, treatment_id: form.package_id, total_cost: pBase }
+             ]);
+         }
       }
     }
     
@@ -147,13 +178,23 @@ export default function PatientsPage() {
 
   async function addTreatmentToPatient() {
     if (!newTreatmentId) return;
-    const t = treatmentsCatalog.find(tc => tc.id === newTreatmentId);
-    if (!t) return;
+    
+    let matchedId = newTreatmentId;
+    let finalCost = 0;
+    
+    const pBase = lookupPrice(selectedPatient?.room_id, newTreatmentId);
+    if (pBase !== null) {
+       finalCost = pBase;
+    } else {
+       const t = treatmentsCatalog.find(tc => tc.id === newTreatmentId);
+       if (!t) return;
+       finalCost = t.price;
+    }
     
     const { error } = await supabase.from('patient_treatments').insert([{
       patient_id: selectedPatient.id,
-      treatment_id: t.id,
-      total_cost: t.price
+      treatment_id: matchedId,
+      total_cost: finalCost
     }]);
     
     if (error) alert(error.message);
@@ -275,11 +316,17 @@ export default function PatientsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Assign Room</label>
-              <select className="w-full border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm bg-white" onChange={e => setForm({...form, room_id: e.target.value})}>
-                <option value="">-- Select --</option>
-                {rooms.filter(r => r.status === 'Available').map(r => <option key={r.id} value={r.id}>{r.room_number} ({r.type})</option>)}
-              </select>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Assign Room & Package</label>
+              <div className="flex gap-2">
+                <select className="w-1/2 border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm bg-white" onChange={e => setForm({...form, room_id: e.target.value})}>
+                  <option value="">-- Room --</option>
+                  {rooms.filter(r => r.status === 'Available').map(r => <option key={r.id} value={r.id}>{r.room_number} ({r.type})</option>)}
+                </select>
+                <select className="w-1/2 border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm bg-white" onChange={e => setForm({...form, package_id: e.target.value})}>
+                  <option value="">-- Package --</option>
+                  {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
           <div className="mt-5 flex justify-end">
@@ -370,11 +417,15 @@ export default function PatientsPage() {
           
           <div className="grid grid-cols-1 lg:grid-cols-2">
              <div className="p-6 border-r border-gray-100">
-                <h3 className="text-lg font-bold mb-4 flex items-center text-gray-800"><Activity className="w-5 h-5 mr-2 text-blue-500"/> Treatments</h3>
+                <h3 className="text-lg font-bold mb-4 flex items-center text-gray-800"><Activity className="w-5 h-5 mr-2 text-blue-500"/> Ayurvedic Packages</h3>
                 <div className="flex gap-2 mb-4">
                    <select className="flex-1 border-gray-300 border rounded-md px-3 py-2 text-sm bg-white" value={newTreatmentId} onChange={e => setNewTreatmentId(e.target.value)}>
-                     <option value="">Select Treatment...</option>
-                     {treatmentsCatalog.map(t => <option key={t.id} value={t.id}>{t.name} (₹{t.price})</option>)}
+                     <option value="">Select Medical Package...</option>
+                     {packages.map(p => {
+                       const dynamicPrice = lookupPrice(selectedPatient?.room_id, p.id);
+                       return <option key={p.id} value={p.id}>{p.name} {dynamicPrice !== null ? `(₹${dynamicPrice})` : ''}</option>
+                     })}
+                     {treatmentsCatalog.filter(t => !packages.find(p=>p.name===t.name)).map(t => <option key={t.id} value={t.id}>{t.name} (₹{t.price})</option>)}
                    </select>
                    <button onClick={addTreatmentToPatient} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 text-sm shadow-sm whitespace-nowrap">Add</button>
                 </div>
