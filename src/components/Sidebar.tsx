@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Home, Users, Bed, CreditCard, Stethoscope, Briefcase, Pill, PhoneCall, LogOut, FileText, Menu, X } from 'lucide-react';
+import { Home, Users, Bed, CreditCard, Stethoscope, Briefcase, Pill, PhoneCall, LogOut, FileText, Menu, X, Library } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -12,6 +12,7 @@ const navigation = [
   { name: 'Patients', href: '/patients', icon: Users },
   { name: 'Discharged Record', href: '/discharged', icon: FileText },
   { name: 'Treatments', href: '/treatments', icon: Pill },
+  { name: 'Packages', href: '/packages', icon: Library },
   { name: 'Rooms', href: '/rooms', icon: Bed },
   { name: 'Billing', href: '/billing', icon: CreditCard },
   { name: 'Doctors', href: '/doctors', icon: Stethoscope },

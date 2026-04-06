@@ -41,19 +41,45 @@ export default function LeadsPage() {
   const [editForm, setEditForm] = useState<Partial<Lead>>({});
   const [editWarning, setEditWarning] = useState('');
 
+  // Packages state Matrix
+  const [packages, setPackages] = useState<any[]>([]);
+  const [prices, setPrices] = useState<any[]>([]);
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('');
+  const [editSelectedPackageId, setEditSelectedPackageId] = useState<string>('');
+
   useEffect(() => {
     fetchAllData();
   }, []);
 
   async function fetchAllData() {
     setLoading(true);
-    const [leadsRes, roomsRes] = await Promise.all([
+    const [leadsRes, roomsRes, pkgRes, prcRes] = await Promise.all([
       supabase.from('leads').select('*, rooms(id, room_number, type, ac_type, bed_type)').order('created_at', { ascending: false }),
-      supabase.from('rooms').select('*').order('room_number')
+      supabase.from('rooms').select('*').order('room_number'),
+      supabase.from('packages').select('*').order('duration_days'),
+      supabase.from('room_package_prices').select('*')
     ]);
     if (leadsRes.data) setLeads(leadsRes.data);
     if (roomsRes.data) setRooms(roomsRes.data);
+    if (pkgRes.data) setPackages(pkgRes.data);
+    if (prcRes.data) setPrices(prcRes.data);
     setLoading(false);
+  }
+
+  function lookupPrice(roomId: string, pkgId: string): number | null {
+    if (!roomId || !pkgId) return null;
+    const room = rooms.find(r => r.id === roomId);
+    const pkg = packages.find(p => p.id === pkgId);
+    if (!room || !pkg) return null;
+    const priceRow = prices.find(p => p.room_number === room.room_number);
+    if (!priceRow) return null;
+    let priceCol = '';
+    const pkgName = pkg.name.toLowerCase();
+    if (pkgName.includes('sutika')) priceCol = 'sutika_care_price';
+    else if (pkgName.includes('purna shakti')) priceCol = 'purna_shakti_price';
+    else if (pkgName.includes('suvarna 21')) priceCol = 'suvarna_21_price';
+    else if (pkgName.includes('sampurna raksha')) priceCol = 'sampurna_raksha_price';
+    return priceCol && priceRow[priceCol] ? Number(priceRow[priceCol]) : null;
   }
 
   // Check if same room + same date already booked in leads (simple check)
@@ -77,13 +103,38 @@ export default function LeadsPage() {
   }, []);
 
   // --- ADD handlers ---
-  async function handleAddFieldChange(field: 'room_id' | 'booking_date', value: string) {
-    const updated = { ...newLead, [field]: value };
-    setNewLead(updated);
-    const roomId = field === 'room_id' ? value : (newLead.room_id || '');
-    const date = field === 'booking_date' ? value : (newLead.booking_date || '');
-    const warning = await checkBooking(roomId, date);
-    setAvailabilityWarning(warning);
+  async function handleAddFieldChange(field: 'room_id' | 'booking_date' | 'package_id', value: string) {
+    let currentNewLead = { ...newLead };
+    let currentRoomId = newLead.room_id || '';
+    let currentPkgId = selectedPackageId;
+    let currentDate = newLead.booking_date || '';
+
+    if (field === 'room_id') {
+      currentRoomId = value;
+      currentNewLead.room_id = value;
+    } else if (field === 'booking_date') {
+      currentDate = value;
+      currentNewLead.booking_date = value;
+    } else if (field === 'package_id') {
+      currentPkgId = value;
+      setSelectedPackageId(value);
+    }
+    
+    if (currentRoomId && currentPkgId) {
+      const p = lookupPrice(currentRoomId, currentPkgId);
+      if (p !== null) {
+         currentNewLead.expected_payment = p;
+         const pkgName = packages.find(x => x.id === currentPkgId)?.name;
+         if (pkgName) currentNewLead.enquiry_details = `Package: ${pkgName}`;
+      }
+    }
+    
+    setNewLead(currentNewLead);
+
+    if (field === 'room_id' || field === 'booking_date') {
+      const warning = await checkBooking(currentRoomId, currentDate);
+      setAvailabilityWarning(warning);
+    }
   }
 
   async function saveLead() {
@@ -123,16 +174,42 @@ export default function LeadsPage() {
       booking_date: lead.booking_date || '',
       room_id: lead.room_id || '',
     });
+    setEditSelectedPackageId('');
     setEditWarning('');
   }
 
-  async function handleEditFieldChange(field: 'room_id' | 'booking_date', value: string) {
-    const updated = { ...editForm, [field]: value };
+  async function handleEditFieldChange(field: 'room_id' | 'booking_date' | 'package_id', value: string) {
+    let updated = { ...editForm };
+    let currentRoomId = editForm.room_id || '';
+    let currentPkgId = editSelectedPackageId;
+    let currentDate = editForm.booking_date || '';
+
+    if (field === 'room_id') {
+      currentRoomId = value;
+      updated.room_id = value;
+    } else if (field === 'booking_date') {
+      currentDate = value;
+      updated.booking_date = value;
+    } else if (field === 'package_id') {
+      currentPkgId = value;
+      setEditSelectedPackageId(value);
+    }
+
+    if (currentRoomId && currentPkgId) {
+      const p = lookupPrice(currentRoomId, currentPkgId);
+      if (p !== null) {
+         updated.expected_payment = p;
+         const pkgName = packages.find(x => x.id === currentPkgId)?.name;
+         if (pkgName) updated.enquiry_details = `Package: ${pkgName}`;
+      }
+    }
+
     setEditForm(updated);
-    const roomId = field === 'room_id' ? value : (editForm.room_id || '');
-    const date = field === 'booking_date' ? value : (editForm.booking_date || '');
-    const warning = await checkBooking(roomId, date, editingId || undefined);
-    setEditWarning(warning);
+
+    if (field === 'room_id' || field === 'booking_date') {
+      const warning = await checkBooking(currentRoomId, currentDate, editingId || undefined);
+      setEditWarning(warning);
+    }
   }
 
   async function saveEdit() {
@@ -291,16 +368,18 @@ export default function LeadsPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                <BedDouble className="w-3 h-3 inline mr-1" /> Book Room
+                <BedDouble className="w-3 h-3 inline mr-1" /> Book Room & Package
               </label>
-              <select
-                className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900 bg-white"
-                value={newLead.room_id || ''}
-                onChange={(e) => handleAddFieldChange('room_id', e.target.value)}
-              >
-                <option value="">-- Select Room --</option>
-                {roomOptions}
-              </select>
+              <div className="flex gap-2">
+                <select className="flex-1 w-1/2 border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900 bg-white" value={newLead.room_id || ''} onChange={(e) => handleAddFieldChange('room_id', e.target.value)}>
+                  <option value="">-- Room --</option>
+                  {roomOptions}
+                </select>
+                <select className="flex-1 w-1/2 border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900 bg-white" value={selectedPackageId} onChange={(e) => handleAddFieldChange('package_id', e.target.value)}>
+                  <option value="">-- Package --</option>
+                  {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -356,10 +435,16 @@ export default function LeadsPage() {
                     <input type="date" className="border rounded px-2 py-1 text-sm" value={editForm.booking_date || ''} onChange={e => handleEditFieldChange('booking_date', e.target.value)} />
                   </td>
                   <td className="px-6 py-3">
-                    <select className="border rounded px-2 py-1 text-sm bg-white" value={editForm.room_id || ''} onChange={e => handleEditFieldChange('room_id', e.target.value)}>
-                      <option value="">-- None --</option>
-                      {roomOptions}
-                    </select>
+                    <div className="flex flex-col space-y-2 max-w-[160px]">
+                      <select className="border rounded px-2 py-1 text-sm bg-white" value={editForm.room_id || ''} onChange={e => handleEditFieldChange('room_id', e.target.value)}>
+                        <option value="">-- None --</option>
+                        {roomOptions}
+                      </select>
+                      <select className="border rounded px-2 py-1 text-sm bg-white" value={editSelectedPackageId} onChange={e => handleEditFieldChange('package_id', e.target.value)}>
+                        <option value="">-- Package --</option>
+                        {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
                     {editWarning && <div className="text-xs text-red-600 mt-1">{editWarning}</div>}
                   </td>
                   <td className="px-6 py-3">
@@ -457,11 +542,17 @@ export default function LeadsPage() {
                   <input type="date" className="w-full border rounded-md px-3 py-2 text-sm mt-1" value={editForm.booking_date || ''} onChange={e => handleEditFieldChange('booking_date', e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase">Room</label>
-                  <select className="w-full border rounded-md px-3 py-2 text-sm mt-1 bg-white" value={editForm.room_id || ''} onChange={e => handleEditFieldChange('room_id', e.target.value)}>
-                    <option value="">-- None --</option>
-                    {roomOptions}
-                  </select>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Room & Package</label>
+                  <div className="flex gap-2 mt-1">
+                    <select className="w-1/2 border rounded-md px-3 py-2 text-sm bg-white" value={editForm.room_id || ''} onChange={e => handleEditFieldChange('room_id', e.target.value)}>
+                      <option value="">-- None --</option>
+                      {roomOptions}
+                    </select>
+                    <select className="w-1/2 border rounded-md px-3 py-2 text-sm bg-white" value={editSelectedPackageId} onChange={e => handleEditFieldChange('package_id', e.target.value)}>
+                      <option value="">-- Package --</option>
+                      {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
                   {editWarning && <div className="text-xs text-red-600 mt-1">{editWarning}</div>}
                 </div>
                 <div>

@@ -14,8 +14,8 @@ function createWindow() {
     title: 'My ERP System'
   })
 
-  // Load the live Cloudflare app
-  mainWindow.loadURL('https://erp-new.adilnabhanc-v.workers.dev/')
+  // Load the live Vercel app
+  mainWindow.loadURL('https://erp-new-gold.vercel.app/')
 
   mainWindow.on('closed', () => {
     mainWindow = null
