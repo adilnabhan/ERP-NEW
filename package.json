@@ -6,12 +6,16 @@
   "private": true,
   "main": "electron.js",
   "scripts": {
-    "dev": "next dev",
     "build": "next build",
+    "dev": "next dev",
     "start": "next start",
     "lint": "eslint",
     "electron": "electron .",
-    "dist": "electron-builder build --win"
+    "dist": "electron-builder build --win",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "build": {
     "appId": "com.yourcompany.erp",
@@ -34,6 +38,7 @@
     ]
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.18.0",
     "@supabase/supabase-js": "^2.101.0",
     "date-fns": "^4.1.0",
     "electron-updater": "^6.8.3",
@@ -53,6 +58,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.80.0"
   }
 }
