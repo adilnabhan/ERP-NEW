@@ -20,6 +20,7 @@ export default function PatientsPage() {
   const [patientPayments, setPatientPayments] = useState<any[]>([]);
   
   const [newTreatmentId, setNewTreatmentId] = useState('');
+  const [newAddonId, setNewAddonId] = useState('');
   const [newPaymentAmount, setNewPaymentAmount] = useState('');
   const [newPaymentMethod, setNewPaymentMethod] = useState('Cash');
 
@@ -55,7 +56,7 @@ export default function PatientsPage() {
   function lookupPrice(roomId: string, pkgId: string): number | null {
     if (!roomId || !pkgId) return null;
     const room = rooms.find(r => r.id === roomId);
-    const pkg = packages.find(p => p.id === pkgId);
+    const pkg = packages.find(p => String(p.id) === String(pkgId));
     if (!room || !pkg) return null;
     const priceRow = prices.find(p => p.room_number === room.room_number);
     if (!priceRow) return null;
@@ -91,12 +92,28 @@ export default function PatientsPage() {
       if (form.room_id) {
          await supabase.from('rooms').update({ status: 'Occupied' }).eq('id', form.room_id);
       }
+      // If package selected, add as a patient treatment with dynamic pricing
       if (form.room_id && form.package_id) {
          const pBase = lookupPrice(form.room_id, form.package_id);
-         if (pBase !== null) {
-             await supabase.from('patient_treatments').insert([
-               { patient_id: newPat.id, treatment_id: form.package_id, total_cost: pBase }
-             ]);
+         const pkg = packages.find(p => String(p.id) === String(form.package_id));
+         if (pBase !== null && pkg) {
+            // Find or use the first treatment catalog entry matching this package name
+            const matchingCatalog = treatmentsCatalog.find(t => t.name === pkg.name);
+            if (matchingCatalog) {
+              await supabase.from('patient_treatments').insert([
+                { patient_id: newPat.id, treatment_id: matchingCatalog.id, total_cost: pBase }
+              ]);
+            } else {
+              // Insert into treatment_catalog first, then add to patient_treatments
+              const { data: newCatalog } = await supabase.from('treatment_catalog').insert([
+                { name: pkg.name, price: pBase }
+              ]).select().single();
+              if (newCatalog) {
+                await supabase.from('patient_treatments').insert([
+                  { patient_id: newPat.id, treatment_id: newCatalog.id, total_cost: pBase }
+                ]);
+              }
+            }
          }
       }
     }
@@ -170,30 +187,45 @@ export default function PatientsPage() {
     if (error) alert(error.message);
     else {
        fetchInitData();
-       // Fetch new patient manually to update selected state elegantly
        const { data } = await supabase.from('patients').select('*, doctors(name), rooms(room_number), billing(*)').eq('id', selectedPatient.id).single();
        if (data) setSelectedPatient(data);
     }
   }
 
+  // Add a PACKAGE to patient (uses dynamic room pricing)
   async function addTreatmentToPatient() {
     if (!newTreatmentId) return;
     
-    let matchedId = newTreatmentId;
-    let finalCost = 0;
-    
-    const pBase = lookupPrice(selectedPatient?.room_id, newTreatmentId);
-    if (pBase !== null) {
-       finalCost = pBase;
+    // newTreatmentId is like "pkg-3" for package id=3
+    const pkgIdStr = newTreatmentId.replace('pkg-', '');
+    const pkg = packages.find(p => String(p.id) === pkgIdStr);
+    if (!pkg) return;
+
+    const pBase = lookupPrice(selectedPatient?.room_id, pkgIdStr);
+    const finalCost = pBase !== null ? pBase : 0;
+
+    // Find or create a treatment_catalog entry for this package
+    let catalogId: string | null = null;
+    const match = treatmentsCatalog.find(t => t.name === pkg.name);
+    if (match) {
+      catalogId = match.id;
     } else {
-       const t = treatmentsCatalog.find(tc => tc.id === newTreatmentId);
-       if (!t) return;
-       finalCost = t.price;
+      const { data: newCat } = await supabase.from('treatment_catalog').insert([
+        { name: pkg.name, price: finalCost }
+      ]).select().single();
+      if (newCat) {
+        catalogId = newCat.id;
+        // Refresh catalog
+        const { data: updatedCatalog } = await supabase.from('treatment_catalog').select('*');
+        if (updatedCatalog) setTreatmentsCatalog(updatedCatalog);
+      }
     }
+
+    if (!catalogId) return;
     
     const { error } = await supabase.from('patient_treatments').insert([{
       patient_id: selectedPatient.id,
-      treatment_id: matchedId,
+      treatment_id: catalogId,
       total_cost: finalCost
     }]);
     
@@ -202,6 +234,33 @@ export default function PatientsPage() {
       setNewTreatmentId('');
       openPatientDetails(selectedPatient); 
     }
+  }
+
+  // Add an ADDITIONAL TREATMENT (face, body, herbal, etc.)
+  async function addAddonTreatment() {
+    if (!newAddonId) return;
+    
+    const t = treatmentsCatalog.find(tc => tc.id === newAddonId);
+    if (!t) return;
+
+    const { error } = await supabase.from('patient_treatments').insert([{
+      patient_id: selectedPatient.id,
+      treatment_id: t.id,
+      total_cost: t.price
+    }]);
+    
+    if (error) alert(error.message);
+    else {
+      setNewAddonId('');
+      openPatientDetails(selectedPatient);
+    }
+  }
+
+  async function removeTreatment(treatmentRecordId: string) {
+    if (!confirm('Remove this treatment/package?')) return;
+    const { error } = await supabase.from('patient_treatments').delete().eq('id', treatmentRecordId);
+    if (error) alert(error.message);
+    else openPatientDetails(selectedPatient);
   }
 
   async function addPayment() {
@@ -227,7 +286,6 @@ export default function PatientsPage() {
       setNewPaymentAmount('');
       fetchInitData(); 
       setTimeout(() => {
-         const updatedPat = patients.find(p => p.id === selectedPatient.id) || selectedPatient;
          const updatedBillPat = { ...selectedPatient, billing: [{ ...currentBilling, total_paid: (currentBilling?.total_paid || 0) + amt }] };
          setSelectedPatient(updatedBillPat);
          openPatientDetails(updatedBillPat); 
@@ -267,9 +325,14 @@ export default function PatientsPage() {
     a.click();
   }
 
-  const calcTotalTreatmentCost = () => patientTreatments.reduce((acc, curr) => acc + (curr.total_cost || 0), 0);
+  const calcTotalTreatmentCost = () => patientTreatments.reduce((acc, curr) => acc + (Number(curr.total_cost) || 0), 0);
   const totalPaid = selectedPatient?.billing?.[0]?.total_paid || 0;
   const balanceDue = calcTotalTreatmentCost() - totalPaid;
+
+  // Separate package items from addon treatments for display
+  const packageNames = packages.map(p => p.name);
+  const pkgItems = patientTreatments.filter(pt => packageNames.includes(pt.treatment_catalog?.name));
+  const addonItems = patientTreatments.filter(pt => !packageNames.includes(pt.treatment_catalog?.name));
 
   return (
     <div className="space-y-6">
@@ -417,34 +480,80 @@ export default function PatientsPage() {
           
           <div className="grid grid-cols-1 lg:grid-cols-2">
              <div className="p-6 border-r border-gray-100">
-                <h3 className="text-lg font-bold mb-4 flex items-center text-gray-800"><Activity className="w-5 h-5 mr-2 text-blue-500"/> Ayurvedic Packages</h3>
-                <div className="flex gap-2 mb-4">
-                   <select className="flex-1 border-gray-300 border rounded-md px-3 py-2 text-sm bg-white" value={newTreatmentId} onChange={e => setNewTreatmentId(e.target.value)}>
-                     <option value="">Select Medical Package...</option>
-                     {packages.map(p => {
-                       const dynamicPrice = lookupPrice(selectedPatient?.room_id, p.id);
-                       return <option key={p.id} value={p.id}>{p.name} {dynamicPrice !== null ? `(₹${dynamicPrice})` : ''}</option>
-                     })}
-                     {treatmentsCatalog.filter(t => !packages.find(p=>p.name===t.name)).map(t => <option key={t.id} value={t.id}>{t.name} (₹{t.price})</option>)}
-                   </select>
-                   <button onClick={addTreatmentToPatient} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 text-sm shadow-sm whitespace-nowrap">Add</button>
+                <h3 className="text-lg font-bold mb-4 flex items-center text-gray-800"><Activity className="w-5 h-5 mr-2 text-blue-500"/> Packages & Treatments</h3>
+                
+                {/* Package Selection */}
+                <div className="mb-4 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                   <label className="block text-xs font-semibold text-blue-700 uppercase tracking-wider mb-2">Add Package</label>
+                   <div className="flex gap-2">
+                     <select className="flex-1 border-gray-300 border rounded-md px-3 py-2 text-sm bg-white" value={newTreatmentId} onChange={e => setNewTreatmentId(e.target.value)}>
+                       <option value="">Select Package...</option>
+                       {packages.map(p => {
+                         const dynamicPrice = lookupPrice(selectedPatient?.room_id, String(p.id));
+                         return <option key={`pkg-${p.id}`} value={`pkg-${p.id}`}>{p.name} {dynamicPrice !== null ? `(₹${dynamicPrice.toLocaleString()})` : `(${p.duration})`}</option>
+                       })}
+                     </select>
+                     <button onClick={addTreatmentToPatient} className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 text-sm shadow-sm whitespace-nowrap">Add</button>
+                   </div>
+                </div>
+
+                {/* Additional Treatments */}
+                <div className="mb-4 p-3 bg-purple-50/50 rounded-lg border border-purple-100">
+                   <label className="block text-xs font-semibold text-purple-700 uppercase tracking-wider mb-2">Add Additional Treatment</label>
+                   <div className="flex gap-2">
+                     <select className="flex-1 border-gray-300 border rounded-md px-3 py-2 text-sm bg-white" value={newAddonId} onChange={e => setNewAddonId(e.target.value)}>
+                       <option value="">Select Treatment (Face, Body, Herbal...)</option>
+                       {treatmentsCatalog.filter(t => !packageNames.includes(t.name)).map(t => <option key={t.id} value={t.id}>{t.name} (₹{Number(t.price).toLocaleString()})</option>)}
+                     </select>
+                     <button onClick={addAddonTreatment} className="px-4 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 text-sm shadow-sm whitespace-nowrap">Add</button>
+                   </div>
                 </div>
                 
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                   {patientTreatments.length === 0 ? <p className="text-gray-400 text-sm italic">No treatments recorded yet.</p> : null}
-                   {patientTreatments.map(pt => (
-                     <div key={pt.id} className="flex justify-between items-center p-3 bg-gray-50 border border-gray-100 rounded-lg">
-                        <div>
-                         <p className="font-semibold text-gray-800 text-sm">{pt.treatment_catalog?.name}</p>
-                         <p className="text-xs text-gray-400">{new Date(pt.created_at).toLocaleDateString()}</p>
-                        </div>
-                        <span className="font-bold text-gray-700">₹{pt.total_cost}</span>
+                {/* Itemized List */}
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
+                   {patientTreatments.length === 0 ? <p className="text-gray-400 text-sm italic">No packages or treatments added yet.</p> : null}
+                   
+                   {/* Package Items */}
+                   {pkgItems.length > 0 && (
+                     <div className="mb-2">
+                       <p className="text-xs font-bold text-blue-600 uppercase mb-1">Packages</p>
+                       {pkgItems.map(pt => (
+                         <div key={pt.id} className="flex justify-between items-center p-3 bg-blue-50 border border-blue-100 rounded-lg mb-1">
+                            <div>
+                             <p className="font-semibold text-gray-800 text-sm">{pt.treatment_catalog?.name || 'Package'}</p>
+                             <p className="text-xs text-gray-400">{new Date(pt.created_at).toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-700">₹{Number(pt.total_cost).toLocaleString()}</span>
+                              <button onClick={() => removeTreatment(pt.id)} className="text-red-400 hover:text-red-600 p-1" title="Remove"><Trash2 className="w-3.5 h-3.5"/></button>
+                            </div>
+                         </div>
+                       ))}
                      </div>
-                   ))}
+                   )}
+
+                   {/* Addon Items */}
+                   {addonItems.length > 0 && (
+                     <div>
+                       <p className="text-xs font-bold text-purple-600 uppercase mb-1">Additional Treatments</p>
+                       {addonItems.map(pt => (
+                         <div key={pt.id} className="flex justify-between items-center p-3 bg-purple-50 border border-purple-100 rounded-lg mb-1">
+                            <div>
+                             <p className="font-semibold text-gray-800 text-sm">{pt.treatment_catalog?.name}</p>
+                             <p className="text-xs text-gray-400">{new Date(pt.created_at).toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-gray-700">₹{Number(pt.total_cost).toLocaleString()}</span>
+                              <button onClick={() => removeTreatment(pt.id)} className="text-red-400 hover:text-red-600 p-1" title="Remove"><Trash2 className="w-3.5 h-3.5"/></button>
+                            </div>
+                         </div>
+                       ))}
+                     </div>
+                   )}
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center text-lg font-bold text-gray-900">
                    <span>Total Care Bill:</span>
-                   <span>₹{calcTotalTreatmentCost()}</span>
+                   <span>₹{calcTotalTreatmentCost().toLocaleString()}</span>
                 </div>
              </div>
              
@@ -473,7 +582,7 @@ export default function PatientsPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-green-700">₹{pay.amount}</p>
+                          <p className="font-bold text-green-700">₹{Number(pay.amount).toLocaleString()}</p>
                           <p className="text-[10px] text-gray-400">{new Date(pay.payment_date).toLocaleString()}</p>
                         </div>
                      </div>
@@ -481,11 +590,11 @@ export default function PatientsPage() {
                 </div>
                 
                 <div className="mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                   <div className="flex justify-between text-sm mb-2 text-gray-600"><span>Total Billed:</span> <span className="font-semibold text-gray-900">₹{calcTotalTreatmentCost()}</span></div>
-                   <div className="flex justify-between text-sm mb-3 text-gray-600"><span>Total Paid:</span> <span className="font-semibold text-green-600">₹{totalPaid}</span></div>
+                   <div className="flex justify-between text-sm mb-2 text-gray-600"><span>Total Billed:</span> <span className="font-semibold text-gray-900">₹{calcTotalTreatmentCost().toLocaleString()}</span></div>
+                   <div className="flex justify-between text-sm mb-3 text-gray-600"><span>Total Paid:</span> <span className="font-semibold text-green-600">₹{Number(totalPaid).toLocaleString()}</span></div>
                    <div className="flex justify-between text-base border-t pt-2 border-gray-100 font-bold text-gray-900">
                       <span>Balance Due:</span> 
-                      <span className={balanceDue > 0 ? 'text-red-500' : 'text-gray-500'}>₹{balanceDue > 0 ? balanceDue : 0}</span>
+                      <span className={balanceDue > 0 ? 'text-red-500' : 'text-gray-500'}>₹{balanceDue > 0 ? balanceDue.toLocaleString() : 0}</span>
                    </div>
                    
                    {selectedPatient.status !== 'Discharged' && (

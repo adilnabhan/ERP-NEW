@@ -23,7 +23,9 @@ interface Lead {
   created_at: string;
   booking_date: string | null;
   room_id: string | null;
+  package_id: number | null;
   rooms?: Room | null;
+  packages?: { id: number; name: string; duration: string } | null;
 }
 
 const emptyForm = { name: '', contact: '', enquiry_details: '', expected_payment: 0, booking_date: '', room_id: '' };
@@ -54,7 +56,7 @@ export default function LeadsPage() {
   async function fetchAllData() {
     setLoading(true);
     const [leadsRes, roomsRes, pkgRes, prcRes] = await Promise.all([
-      supabase.from('leads').select('*, rooms(id, room_number, type, ac_type, bed_type)').order('created_at', { ascending: false }),
+      supabase.from('leads').select('*, rooms(id, room_number, type, ac_type, bed_type), packages(id, name, duration)').order('created_at', { ascending: false }),
       supabase.from('rooms').select('*').order('room_number'),
       supabase.from('packages').select('*').order('duration_days'),
       supabase.from('room_package_prices').select('*')
@@ -151,6 +153,7 @@ export default function LeadsPage() {
     };
     if (newLead.booking_date) insertData.booking_date = newLead.booking_date;
     if (newLead.room_id) insertData.room_id = newLead.room_id;
+    if (selectedPackageId) insertData.package_id = Number(selectedPackageId);
 
     const { error } = await supabase.from('leads').insert([insertData]);
     if (!error) {
@@ -174,7 +177,7 @@ export default function LeadsPage() {
       booking_date: lead.booking_date || '',
       room_id: lead.room_id || '',
     });
-    setEditSelectedPackageId('');
+    setEditSelectedPackageId(lead.package_id ? String(lead.package_id) : '');
     setEditWarning('');
   }
 
@@ -227,6 +230,7 @@ export default function LeadsPage() {
     else updateData.booking_date = null;
     if (editForm.room_id) updateData.room_id = editForm.room_id;
     else updateData.room_id = null;
+    updateData.package_id = editSelectedPackageId ? Number(editSelectedPackageId) : null;
 
     const { error } = await supabase.from('leads').update(updateData).eq('id', editingId);
     if (!error) {
@@ -410,6 +414,7 @@ export default function LeadsPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Package</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Booking Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Room</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Pay</th>
@@ -466,6 +471,11 @@ export default function LeadsPage() {
                     <div className="flex items-center text-indigo-600"><Phone className="w-3 h-3 mr-1"/> {lead.contact}</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{lead.enquiry_details}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {lead.packages ? (
+                      <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-md text-xs font-semibold">{lead.packages.name}</span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {lead.booking_date ? (
                       <div className="flex items-center"><Calendar className="w-3 h-3 mr-1 text-gray-400" />{new Date(lead.booking_date + 'T00:00:00').toLocaleDateString()}</div>
@@ -512,7 +522,7 @@ export default function LeadsPage() {
               )
             ))}
             {leads.length === 0 && (
-              <tr><td colSpan={8} className="px-6 py-8 text-center text-gray-500">No enquiries found.</td></tr>
+              <tr><td colSpan={9} className="px-6 py-8 text-center text-gray-500">No enquiries found.</td></tr>
             )}
           </tbody>
         </table>
@@ -578,6 +588,11 @@ export default function LeadsPage() {
                 </span>
               </div>
               {lead.enquiry_details && <p className="text-sm text-gray-500 mb-2">{lead.enquiry_details}</p>}
+              {lead.packages && (
+                <div className="mb-2">
+                  <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-md text-xs font-semibold">{lead.packages.name} ({lead.packages.duration})</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                 <div>
                   <span className="text-gray-400 text-xs">Date</span>
