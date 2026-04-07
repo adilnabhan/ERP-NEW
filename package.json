@@ -21,8 +21,7 @@
     },
     "files": [
       "electron.js",
-      "package.json",
-      "!node_modules"
+      "package.json"
     ],
     "asar": true,
     "publish": [

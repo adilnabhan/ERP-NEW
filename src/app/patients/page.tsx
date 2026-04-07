@@ -41,7 +41,7 @@ export default function PatientsPage() {
       supabase.from('doctors').select('*'),
       supabase.from('rooms').select('*'),
       supabase.from('treatment_catalog').select('*'),
-      supabase.from('packages').select('*').order('duration_days'),
+      supabase.from('packages').select('*').order('id'),
       supabase.from('room_package_prices').select('*')
     ]);
     

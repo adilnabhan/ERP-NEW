@@ -58,7 +58,7 @@ export default function LeadsPage() {
     const [leadsRes, roomsRes, pkgRes, prcRes] = await Promise.all([
       supabase.from('leads').select('*, rooms(id, room_number, type, ac_type, bed_type), packages(id, name, duration)').order('created_at', { ascending: false }),
       supabase.from('rooms').select('*').order('room_number'),
-      supabase.from('packages').select('*').order('duration_days'),
+      supabase.from('packages').select('*').order('id'),
       supabase.from('room_package_prices').select('*')
     ]);
     if (leadsRes.data) setLeads(leadsRes.data);
