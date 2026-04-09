@@ -280,9 +280,26 @@ export default function LeadsPage() {
 
           if (newPatient) {
             await supabase.from('billing').insert([{ patient_id: newPatient.id }]);
+            
+            // Add package if it exists
+            if (lead.room_id && lead.package_id) {
+              const pBase = lookupPrice(lead.room_id, String(lead.package_id));
+              const pkg = packages.find(p => p.id === lead.package_id);
+              if (pBase !== null && pkg) {
+                const { data: tCatData } = await supabase.from('treatment_catalog').select('*').eq('name', pkg.name);
+                let catalogId = tCatData && tCatData.length > 0 ? tCatData[0].id : null;
+                if (!catalogId) {
+                  const { data: newCat } = await supabase.from('treatment_catalog').insert([{ name: pkg.name, price: pBase }]).select().single();
+                  if (newCat) catalogId = newCat.id;
+                }
+                if (catalogId) {
+                  await supabase.from('patient_treatments').insert([{ patient_id: newPatient.id, treatment_id: catalogId, total_cost: pBase }]);
+                }
+              }
+            }
           }
 
-          alert('Lead converted! Patient created with room & date from booking.');
+          alert('Lead converted! Patient created with room, date, and package details.');
         }
       }
       fetchAllData();

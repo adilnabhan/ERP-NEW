@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Stethoscope, Users, BedDouble, ChevronDown, ChevronUp, Calendar, Snowflake, Hash } from 'lucide-react';
+import { Stethoscope, Users, BedDouble, ChevronDown, ChevronUp, Calendar, Snowflake, Hash, Plus, Check, X, Edit2, Trash2 } from 'lucide-react';
 
 interface Doctor {
   id: string;
@@ -30,6 +30,15 @@ export default function DoctorsPage() {
   const [expandedDoctor, setExpandedDoctor] = useState<string | null>(null);
   const [doctorPatients, setDoctorPatients] = useState<Record<string, PatientDetail[]>>({});
   const [loadingPatients, setLoadingPatients] = useState<string | null>(null);
+
+  // CRUD State
+  const [isAdding, setIsAdding] = useState(false);
+  const [newDocName, setNewDocName] = useState('');
+  const [newDocSpec, setNewDocSpec] = useState('');
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSpec, setEditSpec] = useState('');
 
   useEffect(() => {
     fetchDoctors();
@@ -91,11 +100,75 @@ export default function DoctorsPage() {
     }
   }
 
+  async function addDoctor() {
+    if (!newDocName.trim()) return alert('Name is required');
+    const { error } = await supabase.from('doctors').insert([{ name: newDocName, specialization: newDocSpec, status: 'Available' }]);
+    if (error) alert(error.message);
+    else {
+      setNewDocName('');
+      setNewDocSpec('');
+      setIsAdding(false);
+      fetchDoctors();
+    }
+  }
+
+  function startEdit(doc: Doctor, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditingId(doc.id);
+    setEditName(doc.name);
+    setEditSpec(doc.specialization);
+  }
+
+  async function saveEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!editingId) return;
+    const { error } = await supabase.from('doctors').update({ name: editName, specialization: editSpec }).eq('id', editingId);
+    if (error) alert(error.message);
+    else {
+      setEditingId(null);
+      fetchDoctors();
+    }
+  }
+
+  async function deleteDoctor(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm('Delete this doctor?')) return;
+    const { error } = await supabase.from('doctors').delete().eq('id', id);
+    if (error) alert(error.message);
+    else fetchDoctors();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">Doctors Directory</h1>
+        <button
+          onClick={() => setIsAdding(true)}
+          className="flex items-center px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+        >
+          <Plus className="w-4 h-4 mr-2" /> New Doctor
+        </button>
       </div>
+
+      {isAdding && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-lg font-bold mb-4">Add New Doctor</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Doctor Name *</label>
+              <input className="w-full border rounded-md px-3 py-2 text-sm outline-none focus:border-indigo-500" value={newDocName} onChange={e => setNewDocName(e.target.value)} placeholder="e.g. Dr. Jane Smith" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Specialization</label>
+              <input className="w-full border rounded-md px-3 py-2 text-sm outline-none focus:border-indigo-500" value={newDocSpec} onChange={e => setNewDocSpec(e.target.value)} placeholder="e.g. Cardiology" />
+            </div>
+          </div>
+          <div className="flex space-x-3 mt-4">
+            <button onClick={addDoctor} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"><Check className="inline w-4 h-4 mr-1"/>Save</button>
+            <button onClick={() => setIsAdding(false)} className="px-4 py-2 border rounded-md hover:bg-gray-50 text-sm font-medium">Cancel</button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading doctors...</div>
@@ -108,32 +181,52 @@ export default function DoctorsPage() {
 
             return (
               <div key={doc.id} className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col hover:shadow-md transition-all duration-200">
-                {/* Doctor Header - Clickable */}
                 <button
                   onClick={() => toggleDoctor(doc.id)}
-                  className="w-full text-left p-5 flex items-center justify-between hover:bg-gray-50/50 rounded-t-xl transition-colors"
+                  className="w-full text-left p-5 flex items-start sm:items-center justify-between hover:bg-gray-50/50 rounded-t-xl transition-colors group"
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center flex-1 pr-4">
                     <div className="h-14 w-14 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
                       <Stethoscope className="h-7 w-7" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{doc.name}</h3>
-                      <p className="text-sm text-gray-500">{doc.specialization}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full 
-                          ${doc.status === 'Available' ? 'bg-green-100 text-green-800' : 
-                            doc.status === 'Busy' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {doc.status}
-                        </span>
-                        <span className="text-xs text-gray-500 flex items-center">
-                          <Users className="w-3 h-3 mr-1" /> {doc.patientCount} patient{doc.patientCount !== 1 ? 's' : ''}
-                        </span>
-                      </div>
+                    <div className="flex-1">
+                      {editingId === doc.id ? (
+                        <div className="space-y-2 w-full pr-4" onClick={e => e.stopPropagation()}>
+                          <input className="w-full text-lg font-bold text-gray-900 border-b border-gray-300 outline-none pb-1 bg-transparent focus:border-indigo-500" value={editName} onChange={e => setEditName(e.target.value)} autoFocus/>
+                          <input className="w-full text-sm text-gray-600 border-b border-gray-300 outline-none pb-1 bg-transparent focus:border-indigo-500" value={editSpec} onChange={e => setEditSpec(e.target.value)}/>
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={saveEdit} className="p-1 rounded bg-green-100 text-green-700 hover:bg-green-200"><Check className="w-4 h-4"/></button>
+                            <button onClick={() => setEditingId(null)} className="p-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"><X className="w-4 h-4"/></button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <h3 className="text-lg font-bold text-gray-900">{doc.name}</h3>
+                          <p className="text-sm text-gray-500">{doc.specialization}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`px-2 py-0.5 inline-flex text-[10px] leading-5 font-semibold rounded-full 
+                              ${doc.status === 'Available' ? 'bg-green-100 text-green-800' : 
+                                doc.status === 'Busy' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
+                              {doc.status}
+                            </span>
+                            <span className="text-xs text-gray-500 flex items-center">
+                              <Users className="w-3 h-3 mr-1" /> {doc.patientCount} patient{doc.patientCount !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div className="text-gray-400">
-                    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  <div className="flex items-center gap-3">
+                    {editingId !== doc.id && (
+                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button onClick={e => startEdit(doc, e)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"><Edit2 className="w-4 h-4"/></button>
+                         <button onClick={e => deleteDoctor(doc.id, e)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                       </div>
+                    )}
+                    <div className="text-gray-400">
+                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </div>
                   </div>
                 </button>
 

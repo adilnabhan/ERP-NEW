@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Home, Users, Bed, CreditCard, Stethoscope, Briefcase, Pill, PhoneCall, LogOut, FileText, Menu, X, Library } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const navigation = [
@@ -20,6 +20,7 @@ const navigation = [
 
 export function Sidebar() {
   const router = useRouter();
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -36,14 +37,19 @@ export function Sidebar() {
         <nav className="px-4 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center px-4 py-3 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-gray-800 text-white'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`}
               >
-                <Icon className="mr-3 flex-shrink-0 h-5 w-5 text-gray-400" aria-hidden="true" />
+                <Icon className={`mr-3 flex-shrink-0 h-5 w-5 ${isActive ? 'text-gray-300' : 'text-gray-400'}`} aria-hidden="true" />
                 {item.name}
               </Link>
             );
