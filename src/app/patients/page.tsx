@@ -131,6 +131,11 @@ export default function PatientsPage() {
         .from("patients")
         .update({
           status: "Admitted",
+          name: form.name,
+          contact: form.contact?.replace(/\D/g, '').slice(0, 15) || '',
+          age: form.age,
+          aadhar: form.aadhar,
+          blood_group: form.blood_group,
           doctor_id: form.doctor_id || null,
           room_id: form.room_id || null,
           discharge_date: null,
@@ -541,8 +546,11 @@ export default function PatientsPage() {
               Patient
             </h2>
             <button
-              onClick={() => setIsAddingMode(false)}
-              className="text-gray-400 hover:text-gray-600"
+              onClick={() => {
+                setIsAddingMode(false);
+                setForm({});
+              }}
+              className="text-gray-400 hover:text-gray-600 focus:outline-none"
             >
               <X className="w-5 h-5" />
             </button>
@@ -567,7 +575,7 @@ export default function PatientsPage() {
                       blood_group: p.blood_group,
                     });
                   } else {
-                    setForm({ ...form, existing_patient_id: null });
+                    setForm({ ...form, existing_patient_id: null, name: '', contact: '', age: '', aadhar: '', blood_group: '' });
                   }
                 }}
                 value={form.existing_patient_id || ""}
