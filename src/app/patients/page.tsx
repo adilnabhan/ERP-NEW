@@ -101,13 +101,16 @@ export default function PatientsPage() {
 
     let targetPatientId = form.existing_patient_id;
 
+    let newPatData: any = null;
+
     if (!targetPatientId) {
+      const cleanContact = form.contact.replace(/\D/g, '').slice(0, 15);
       const { data: newPat, error } = await supabase
         .from("patients")
         .insert([
           {
             name: form.name,
-            contact: form.contact,
+            contact: cleanContact,
             age: form.age,
             aadhar: form.aadhar,
             blood_group: form.blood_group,
@@ -120,6 +123,7 @@ export default function PatientsPage() {
         .single();
       if (error) return alert(error.message);
       targetPatientId = newPat.id;
+      newPatData = newPat;
       await supabase.from("billing").insert([{ patient_id: targetPatientId }]);
     } else {
       // Updating existing patient
@@ -184,7 +188,14 @@ export default function PatientsPage() {
 
     setIsAddingMode(false);
     setForm({});
-    fetchInitData();
+    await fetchInitData();
+    
+    if (newPatData) {
+      openPatientDetails(newPatData);
+    } else if (targetPatientId) {
+      const exist = patients.find(p => p.id === targetPatientId);
+      if (exist) openPatientDetails(exist);
+    }
   }
 
   async function reAdmitCurrentPatient() {

@@ -42,6 +42,7 @@ export default function LeadsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Lead>>({});
   const [editWarning, setEditWarning] = useState('');
+  const [convertingLead, setConvertingLead] = useState<any>(null);
 
   // Packages state Matrix
   const [packages, setPackages] = useState<any[]>([]);
@@ -258,15 +259,15 @@ export default function LeadsPage() {
   }
 
   // --- STATUS handler ---
-  async function updateStatus(id: string, status: string) {
+  async function updateStatus(id: string, status: string, leadDataOverride?: any) {
     const { error } = await supabase.from('leads').update({ status }).eq('id', id);
     if (!error) {
       if (status === 'Converted') {
-        const lead = leads.find(l => l.id === id);
+        const lead = leadDataOverride || leads.find(l => l.id === id);
         if (lead) {
           const patientData: any = {
             name: lead.name,
-            contact: lead.contact,
+            contact: formatPhoneNumber(lead.contact),
             status: 'Admitted'
           };
           if (lead.room_id) patientData.room_id = lead.room_id;
@@ -300,9 +301,33 @@ export default function LeadsPage() {
           }
 
           alert('Lead converted! Patient created with room, date, and package details.');
+          setConvertingLead(null);
         }
       }
       fetchAllData();
+    }
+  }
+
+  function formatPhoneNumber(num: string) {
+    if (!num) return '';
+    return num.replace(/\D/g, '').slice(0, 15);
+  }
+
+  async function completeConversion() {
+    if (convertingLead) {
+      // First save edits to DB if any
+      const { error } = await supabase.from('leads').update({
+        room_id: convertingLead.room_id || null,
+        package_id: convertingLead.package_id || null,
+        expected_payment: convertingLead.expected_payment || 0,
+        booking_date: convertingLead.booking_date || null
+      }).eq('id', convertingLead.id);
+      
+      if (!error) {
+        updateStatus(convertingLead.id, 'Converted', convertingLead);
+      } else {
+        alert(error.message);
+      }
     }
   }
 
@@ -423,6 +448,57 @@ export default function LeadsPage() {
         </div>
       )}
 
+      {convertingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-lg p-6">
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+               <h2 className="text-xl font-bold flex items-center text-gray-800"><Check className="w-5 h-5 mr-2 text-green-600"/> Review & Convert to Patient</h2>
+               <button onClick={() => setConvertingLead(null)} className="text-gray-400 hover:text-red-500"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="space-y-4">
+               <div>
+                 <label className="text-xs font-semibold text-gray-500 uppercase">Patient Name</label>
+                 <div className="text-sm font-medium">{convertingLead.name}</div>
+               </div>
+               <div>
+                 <label className="text-xs font-semibold text-gray-500 uppercase">Contact</label>
+                 <div className="text-sm font-medium">{convertingLead.contact}</div>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="text-xs font-semibold text-gray-500 uppercase">Booking Date</label>
+                   <input type="date" className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.booking_date || ''} onChange={e => setConvertingLead({...convertingLead, booking_date: e.target.value})}/>
+                 </div>
+                 <div>
+                   <label className="text-xs font-semibold text-gray-500 uppercase">Expected Payment</label>
+                   <input type="number" className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.expected_payment || ''} onChange={e => setConvertingLead({...convertingLead, expected_payment: e.target.value})}/>
+                 </div>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="text-xs font-semibold text-gray-500 uppercase">Room</label>
+                   <select className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.room_id || ''} onChange={e => setConvertingLead({...convertingLead, room_id: e.target.value})}>
+                     <option value="">-- None --</option>
+                     {roomOptions}
+                   </select>
+                 </div>
+                 <div>
+                   <label className="text-xs font-semibold text-gray-500 uppercase">Package</label>
+                   <select className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.package_id || ''} onChange={e => setConvertingLead({...convertingLead, package_id: e.target.value})}>
+                     <option value="">-- None --</option>
+                     {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                   </select>
+                 </div>
+               </div>
+            </div>
+            <div className="flex gap-3 justify-end mt-6 pt-4 border-t">
+              <button onClick={() => setConvertingLead(null)} className="px-4 py-2 border rounded-md hover:bg-gray-50 text-sm font-medium">Cancel</button>
+              <button onClick={completeConversion} className="px-5 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium flex items-center"><Check className="w-4 h-4 mr-1"/> Confirm & Convert</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DESKTOP TABLE — hidden on mobile */}
       <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
@@ -525,7 +601,7 @@ export default function LeadsPage() {
                       </button>
                       {lead.status === 'Pending' && (
                         <>
-                          <button onClick={() => updateStatus(lead.id, 'Converted')} className="text-green-600 hover:text-green-900 px-2 py-1 border border-green-200 rounded text-xs bg-green-50 flex items-center">
+                          <button onClick={() => setConvertingLead(lead)} className="text-green-600 hover:text-green-900 px-2 py-1 border border-green-200 rounded text-xs bg-green-50 flex items-center">
                             <Check className="w-3 h-3 mr-1" /> Convert
                           </button>
                           <button onClick={() => updateStatus(lead.id, 'Cancelled')} className="text-red-600 hover:text-red-900 px-2 py-1 border border-red-200 rounded text-xs bg-red-50 flex items-center">
@@ -646,7 +722,7 @@ export default function LeadsPage() {
                 </button>
                 {lead.status === 'Pending' && (
                   <>
-                    <button onClick={() => updateStatus(lead.id, 'Converted')} className="flex items-center text-xs text-green-600 border border-green-200 rounded px-2 py-1 bg-green-50">
+                    <button onClick={() => setConvertingLead(lead)} className="flex items-center text-xs text-green-600 border border-green-200 rounded px-2 py-1 bg-green-50">
                       <Check className="w-3 h-3 mr-1"/> Convert
                     </button>
                     <button onClick={() => updateStatus(lead.id, 'Cancelled')} className="flex items-center text-xs text-red-600 border border-red-200 rounded px-2 py-1 bg-red-50">
