@@ -565,17 +565,17 @@ export default function PatientsPage() {
                 onChange={(e) => {
                   const p = patients.find((x) => x.id === e.target.value);
                   if (p) {
-                    setForm({
-                      ...form,
+                    setForm((prev: any) => ({
+                      ...prev,
                       existing_patient_id: p.id,
                       name: p.name,
                       contact: p.contact,
                       age: p.age,
                       aadhar: p.aadhar,
                       blood_group: p.blood_group,
-                    });
+                    }));
                   } else {
-                    setForm({ ...form, existing_patient_id: null, name: '', contact: '', age: '', aadhar: '', blood_group: '' });
+                    setForm((prev: any) => ({ ...prev, existing_patient_id: null, name: '', contact: '', age: '', aadhar: '', blood_group: '' }));
                   }
                 }}
                 value={form.existing_patient_id || ""}
@@ -595,7 +595,7 @@ export default function PatientsPage() {
               <input
                 className="w-full border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm"
                 value={form.name || ""}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                onChange={(e) => setForm((prev: any) => ({ ...prev, name: e.target.value }))}
               />
             </div>
             <div>
@@ -605,7 +605,7 @@ export default function PatientsPage() {
               <input
                 className="w-full border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm"
                 value={form.contact || ""}
-                onChange={(e) => setForm({ ...form, contact: e.target.value })}
+                onChange={(e) => setForm((prev: any) => ({ ...prev, contact: e.target.value }))}
               />
             </div>
             <div>
@@ -616,7 +616,7 @@ export default function PatientsPage() {
                 type="number"
                 className="w-full border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm"
                 value={form.age || ""}
-                onChange={(e) => setForm({ ...form, age: e.target.value })}
+                onChange={(e) => setForm((prev: any) => ({ ...prev, age: e.target.value }))}
               />
             </div>
             <div>
@@ -626,7 +626,7 @@ export default function PatientsPage() {
               <input
                 className="w-full border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm"
                 value={form.aadhar || ""}
-                onChange={(e) => setForm({ ...form, aadhar: e.target.value })}
+                onChange={(e) => setForm((prev: any) => ({ ...prev, aadhar: e.target.value }))}
               />
             </div>
             <div>
@@ -637,7 +637,7 @@ export default function PatientsPage() {
                 className="w-full border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm"
                 value={form.blood_group || ""}
                 onChange={(e) =>
-                  setForm({ ...form, blood_group: e.target.value })
+                  setForm((prev: any) => ({ ...prev, blood_group: e.target.value }))
                 }
               />
             </div>
@@ -649,7 +649,7 @@ export default function PatientsPage() {
               <select
                 className="w-full border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm bg-white"
                 onChange={(e) =>
-                  setForm({ ...form, doctor_id: e.target.value })
+                  setForm((prev: any) => ({ ...prev, doctor_id: e.target.value }))
                 }
               >
                 <option value="">-- Select --</option>
@@ -668,7 +668,7 @@ export default function PatientsPage() {
                 <select
                   className="w-1/2 border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm bg-white"
                   onChange={(e) =>
-                    setForm({ ...form, room_id: e.target.value })
+                    setForm((prev: any) => ({ ...prev, room_id: e.target.value }))
                   }
                 >
                   <option value="">-- Room --</option>
@@ -683,7 +683,7 @@ export default function PatientsPage() {
                 <select
                   className="w-1/2 border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm bg-white"
                   onChange={(e) =>
-                    setForm({ ...form, package_id: e.target.value })
+                    setForm((prev: any) => ({ ...prev, package_id: e.target.value }))
                   }
                 >
                   <option value="">-- Package --</option>
