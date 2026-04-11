@@ -39,6 +39,12 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
       .eq('status', 'Pending')
       .not('booking_date', 'is', null);
 
+    // Fetch bookings
+    const { data: bookingsData } = await supabase
+      .from('bookings')
+      .select('id, patient_name, room_id, status, booking_date, expected_discharge_date')
+      .in('status', ['Booked', 'Checked-In']);
+
     if (roomsData) {
       setRooms(roomsData);
 
@@ -80,12 +86,27 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
           }
         }
 
-        // Check if Booked by a lead (only if not already occupied by patient on that exact date)
+        // Check Bookings Table overlaps
+        if (status === 'Available') {
+          const overlappingBooking = (bookingsData || []).find(b => {
+             if (b.room_id !== room.id) return false;
+             const bStart = new Date(b.booking_date);
+             bStart.setHours(0,0,0,0);
+             const bEnd = new Date(b.expected_discharge_date || b.booking_date);
+             bEnd.setHours(23,59,59,999);
+             return targetDate >= bStart && targetDate <= bEnd;
+          });
+          if (overlappingBooking) {
+            status = overlappingBooking.status === 'Checked-In' ? 'Occupied' : 'Booked';
+            type = 'booking';
+          }
+        }
+
+        // Check if Booked by a lead
         if (status === 'Available') {
           const bookingLead = (leadsData || []).find(l => l.room_id === room.id && l.booking_date === selectedDate);
           if (bookingLead) {
             status = 'Booked';
-            occupant = bookingLead.name;
             type = 'lead';
           }
         }
@@ -93,7 +114,7 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
         return {
           room,
           status,
-          occupant,
+          occupant: '', // Blank text due to user privacy request
           type
         };
       });
@@ -187,8 +208,7 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
                       <p className="text-sm font-medium text-green-600">Ready for booking</p>
                     ) : (
                       <p className={`text-sm font-semibold truncate ${item.status === 'Occupied' ? 'text-red-600' : 'text-yellow-600'}`}>
-                        {item.type === 'patient' ? 'Admitted: ' : 'Booking: '} 
-                        <span className="text-gray-800">{item.occupant}</span>
+                        {item.status === 'Occupied' ? 'Already Occupied' : 'Reserved Booking'}
                       </p>
                     )}
                   </div>
