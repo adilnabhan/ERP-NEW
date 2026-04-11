@@ -31,8 +31,9 @@ export function Sidebar() {
 
   const navContent = (
     <>
-      <div className="flex items-center flex-shrink-0 px-6 mb-6">
-        <span className="text-xl font-bold tracking-tight text-gray-900">Clinic ERP</span>
+      <div className="flex items-center flex-shrink-0 px-6 mb-6 mt-2">
+        <img src="/Blish_shore_coloured.png" alt="Bliss Shore" className="w-10 h-10 object-contain mr-3" />
+        <span className="text-xl font-extrabold tracking-tight text-gray-900 leading-tight">Bliss Shore<br/><span className="text-sm font-semibold text-gray-500">Ayur Care</span></span>
       </div>
       <div className="flex-1 mt-2 overflow-y-auto">
         <nav className="px-4 space-y-1">
