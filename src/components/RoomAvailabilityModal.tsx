@@ -11,15 +11,23 @@ interface RoomAvailabilityModalProps {
 
 export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabilityModalProps) {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('');
+  const [packages, setPackages] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [availability, setAvailability] = useState<any[]>([]);
 
   useEffect(() => {
     if (isOpen) {
+      if (packages.length === 0) fetchPackages();
       fetchAvailability();
     }
-  }, [isOpen, selectedDate]);
+  }, [isOpen, selectedDate, selectedPackageId]);
+
+  async function fetchPackages() {
+    const { data } = await supabase.from('packages').select('id, name, duration_days').order('id');
+    if (data) setPackages(data);
+  }
 
   async function fetchAvailability() {
     setLoading(true);
@@ -51,6 +59,18 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
       const targetDate = new Date(selectedDate);
       targetDate.setHours(0, 0, 0, 0);
 
+      let durationDays = 1;
+      if (selectedPackageId) {
+         const pkg = packages.find(p => String(p.id) === selectedPackageId);
+         if (pkg && pkg.duration_days) {
+            durationDays = pkg.duration_days;
+         }
+      }
+
+      const targetDateEnd = new Date(targetDate);
+      targetDateEnd.setDate(targetDateEnd.getDate() + (durationDays - 1));
+      targetDateEnd.setHours(23, 59, 59, 999);
+
       const roomStatusList = roomsData.map(room => {
         let status = 'Available';
         let occupant = '';
@@ -67,14 +87,14 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
           if (occupyingPatient.discharge_date) {
             const discDate = new Date(occupyingPatient.discharge_date);
             discDate.setHours(23,59,59,999);
-            if (targetDate >= admDate && targetDate <= discDate) {
+            if (admDate <= targetDateEnd && discDate >= targetDate) {
                isOccupiedByPatient = true;
             }
           } else {
             // currently admitted and no discharge date, we assume it's occupied today and onwards 
             // until discharged or based on expected duration. 
             // We'll just mark it occupied if target date is >= admission date and they are still admitted.
-            if (targetDate >= admDate) {
+            if (admDate <= targetDateEnd) {
               isOccupiedByPatient = true;
             }
           }
@@ -94,7 +114,7 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
              bStart.setHours(0,0,0,0);
              const bEnd = new Date(b.expected_discharge_date || b.booking_date);
              bEnd.setHours(23,59,59,999);
-             return targetDate >= bStart && targetDate <= bEnd;
+             return bStart <= targetDateEnd && bEnd >= targetDate;
           });
           if (overlappingBooking) {
             status = overlappingBooking.status === 'Checked-In' ? 'Occupied' : 'Booked';
@@ -104,7 +124,14 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
 
         // Check if Booked by a lead
         if (status === 'Available') {
-          const bookingLead = (leadsData || []).find(l => l.room_id === room.id && l.booking_date === selectedDate);
+          const bookingLead = (leadsData || []).find(l => {
+              if (l.room_id !== room.id) return false;
+              const lStart = new Date(l.booking_date);
+              lStart.setHours(0,0,0,0);
+              const lEnd = new Date(l.booking_date);
+              lEnd.setHours(23, 59, 59, 999);
+              return lStart <= targetDateEnd && lEnd >= targetDate;
+          });
           if (bookingLead) {
             status = 'Booked';
             type = 'lead';
@@ -148,19 +175,32 @@ export default function RoomAvailabilityModal({ isOpen, onClose }: RoomAvailabil
         </div>
 
         {/* Search Bar area */}
-        <div className="p-6 bg-gray-50 border-b border-gray-100 flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex items-center w-full max-w-sm">
-             <label className="mr-3 font-semibold text-gray-700 whitespace-nowrap">Select Date:</label>
+        <div className="p-6 bg-gray-50 border-b border-gray-100 flex flex-col md:flex-row items-center gap-4">
+          <div className="flex items-center w-full md:w-auto">
+             <label className="mr-3 font-semibold text-gray-700 whitespace-nowrap">Check-in:</label>
              <input
                type="date"
-               className="flex-1 w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all shadow-sm"
+               className="flex-1 w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all shadow-sm text-sm"
                value={selectedDate}
                onChange={(e) => setSelectedDate(e.target.value)}
              />
           </div>
+          <div className="flex items-center w-full md:w-auto">
+             <label className="mr-3 font-semibold text-gray-700 whitespace-nowrap">Package:</label>
+             <select
+               className="flex-1 w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all shadow-sm bg-white text-sm"
+               value={selectedPackageId}
+               onChange={(e) => setSelectedPackageId(e.target.value)}
+             >
+               <option value="">-- Single Day --</option>
+               {packages.map(p => (
+                 <option key={p.id} value={p.id}>{p.name} ({p.duration_days}d)</option>
+               ))}
+             </select>
+          </div>
           <button 
              onClick={fetchAvailability}
-             className="px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center"
+             className="w-full md:w-auto px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center justify-center text-sm"
           >
             <Search className="w-4 h-4 mr-2" /> Check Status
           </button>
