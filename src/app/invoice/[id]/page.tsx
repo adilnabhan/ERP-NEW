@@ -52,13 +52,11 @@ export default function InvoicePage() {
           {/* Header */}
           <div className="flex justify-between items-start border-b border-gray-200 pb-8 mb-8">
             <div className="flex items-center">
-              <div className="bg-indigo-600 p-3 rounded-xl mr-4 print:bg-indigo-600">
-                 <Hospital className="w-8 h-8 text-white" />
-              </div>
+              <img src="/Blish_shore_coloured.png" alt="Bliss Shore Logo" className="w-24 object-contain mr-4" />
               <div>
-                <h1 className="text-3xl font-extrabold text-gray-900">Clinic ERP Center</h1>
-                <p className="text-gray-500">123 Health Avenue, Medical District</p>
-                <p className="text-gray-500">contact@clinicerp.com | +91 9876543210</p>
+                <h1 className="text-3xl font-extrabold text-gray-900">Bliss Shore Ayur Care</h1>
+                <p className="text-gray-500">CW37+QG8, Kizhakkoth, Kerala 673572</p>
+                <p className="text-gray-500">contact@blissshore.com | +91 9876543210</p>
               </div>
             </div>
             <div className="text-right">
@@ -151,7 +149,7 @@ export default function InvoicePage() {
 
           {/* Footer */}
           <div className="mt-16 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
-            <p className="font-bold text-gray-800 mb-1">Thank you for trusting Clinic ERP.</p>
+            <p className="font-bold text-gray-800 mb-1">Thank you for trusting Bliss Shore Ayur Care.</p>
             <p>This is a computer-generated invoice and does not require a physical signature.</p>
           </div>
         </div>

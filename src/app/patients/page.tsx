@@ -39,6 +39,7 @@ export default function PatientsPage() {
   const [newPaymentAmount, setNewPaymentAmount] = useState("");
   const [newPaymentReceived, setNewPaymentReceived] = useState("");
   const [newPaymentMethod, setNewPaymentMethod] = useState("Cash");
+  const [couponCode, setCouponCode] = useState("");
 
   // Edit mode inside patient details
   const [isEditingPatient, setIsEditingPatient] = useState(false);
@@ -449,6 +450,47 @@ export default function PatientsPage() {
         setSelectedPatient(updatedBillPat);
         openPatientDetails(updatedBillPat);
       }, 500);
+    }
+  }
+
+  async function applyCoupon() {
+    if (couponCode.toLowerCase() === "mala123") {
+      const balance = calcTotalTreatmentCost() - (selectedPatient?.billing?.[0]?.total_paid || 0);
+      if (balance <= 0) return alert("No balance to discount");
+      const discountAmount = balance * 0.10; // 10% discount on remaining balance
+      const { error } = await supabase.from("payments").insert([
+        {
+          patient_id: selectedPatient.id,
+          amount: discountAmount,
+          payment_type: "Coupon Discount (-10%)",
+          method: "Coupon",
+        },
+      ]);
+      if (error) alert(error.message);
+      else {
+        alert(`Coupon applied! ₹${discountAmount.toLocaleString()} discount subtracted from balance.`);
+        setCouponCode("");
+        const currentBilling = selectedPatient.billing[0];
+        if (currentBilling) {
+          await supabase.from("billing").update({ total_paid: (currentBilling.total_paid || 0) + discountAmount }).eq("id", currentBilling.id);
+        }
+        fetchInitData();
+        setTimeout(() => {
+          const updatedBillPat = {
+            ...selectedPatient,
+            billing: [
+              {
+                ...currentBilling,
+                total_paid: (currentBilling?.total_paid || 0) + discountAmount,
+              },
+            ],
+          };
+          setSelectedPatient(updatedBillPat);
+          openPatientDetails(updatedBillPat);
+        }, 500);
+      }
+    } else {
+      alert("Invalid coupon code");
     }
   }
 
@@ -1125,6 +1167,23 @@ export default function PatientsPage() {
                      <span>₹{(Number(newPaymentReceived) - Number(newPaymentAmount)).toLocaleString()}</span>
                    </div>
                 )}
+                
+                {/* Coupon Code Section */}
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    placeholder="Enter Coupon Code"
+                    className="flex-1 border-gray-300 border rounded-md px-3 py-2 text-sm uppercase bg-yellow-50"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                  />
+                  <button
+                    onClick={applyCoupon}
+                    className="px-4 py-2 bg-yellow-500 text-white font-bold rounded-md hover:bg-yellow-600 text-sm shadow-sm whitespace-nowrap"
+                  >
+                    Apply Coupon
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
