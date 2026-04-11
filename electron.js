@@ -11,7 +11,8 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
     },
-    title: 'My ERP System'
+    title: 'Bliss Shore Ayur Care',
+    icon: path.join(__dirname, 'public/Blish_shore_coloured.png')
   })
 
   // Load the live Vercel app

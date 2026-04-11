@@ -1,7 +1,7 @@
 {
-  "name": "erp-new",
+  "name": "bliss-shore-erp",
   "version": "0.1.0",
-  "description": "Hospital ERP Desktop App",
+  "description": "Bliss Shore Ayur Care ERP",
   "author": "Vibecoding",
   "private": true,
   "main": "electron.js",
@@ -14,14 +14,16 @@
     "dist": "electron-builder build --win"
   },
   "build": {
-    "appId": "com.yourcompany.erp",
-    "productName": "My ERP System",
+    "appId": "com.blissshore.erp",
+    "productName": "Bliss Shore Ayur Care",
+    "icon": "public/Blish_shore_coloured.png",
     "win": {
       "target": "nsis"
     },
     "files": [
       "electron.js",
-      "package.json"
+      "package.json",
+      "public/**/*"
     ],
     "asar": true,
     "publish": [
