@@ -14,8 +14,8 @@ const fontMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clinic ERP System",
-  description: "Professional Clinic ERP Software",
+  title: "Bliss Shore Ayur Care",
+  description: "Professional Ayur Care ERP",
 };
 
 export default function RootLayout({
