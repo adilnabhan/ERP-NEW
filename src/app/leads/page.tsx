@@ -146,9 +146,19 @@ export default function LeadsPage() {
     // Block save if already booked
     if (availabilityWarning) return alert(availabilityWarning);
 
+    // Check for duplicate contact number
+    const cleanContact = (newLead.contact || '').replace(/\D/g, '');
+    if (cleanContact) {
+      const { data: existing } = await supabase.from('leads').select('id, name').eq('contact', cleanContact);
+      if (existing && existing.length > 0) {
+        const proceed = confirm(`⚠️ Contact "${cleanContact}" already exists for lead "${existing[0].name}". Do you still want to add this enquiry?`);
+        if (!proceed) return;
+      }
+    }
+
     const insertData: any = {
       name: newLead.name,
-      contact: newLead.contact,
+      contact: cleanContact || newLead.contact,
       enquiry_details: newLead.enquiry_details,
       expected_payment: newLead.expected_payment
     };
@@ -370,7 +380,7 @@ export default function LeadsPage() {
                 placeholder="Full Name"
                 className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900"
                 value={newLead.name || ''}
-                onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
+                onChange={(e) => setNewLead((prev: any) => ({ ...prev, name: e.target.value }))}
               />
             </div>
             <div>
@@ -379,7 +389,7 @@ export default function LeadsPage() {
                 placeholder="Contact Number"
                 className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900"
                 value={newLead.contact || ''}
-                onChange={(e) => setNewLead({ ...newLead, contact: e.target.value })}
+                onChange={(e) => setNewLead((prev: any) => ({ ...prev, contact: e.target.value }))}
               />
             </div>
             <div>
@@ -389,7 +399,7 @@ export default function LeadsPage() {
                 placeholder="Expected Payment"
                 className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900"
                 value={newLead.expected_payment || ''}
-                onChange={(e) => setNewLead({ ...newLead, expected_payment: Number(e.target.value) })}
+                onChange={(e) => setNewLead((prev: any) => ({ ...prev, expected_payment: Number(e.target.value) }))}
               />
             </div>
             <div>
@@ -398,7 +408,7 @@ export default function LeadsPage() {
                 placeholder="e.g., specific treatment"
                 className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:border-gray-900"
                 value={newLead.enquiry_details || ''}
-                onChange={(e) => setNewLead({ ...newLead, enquiry_details: e.target.value })}
+                onChange={(e) => setNewLead((prev: any) => ({ ...prev, enquiry_details: e.target.value }))}
               />
             </div>
             <div>
@@ -467,24 +477,24 @@ export default function LeadsPage() {
                <div className="grid grid-cols-2 gap-4">
                  <div>
                    <label className="text-xs font-semibold text-gray-500 uppercase">Booking Date</label>
-                   <input type="date" className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.booking_date || ''} onChange={e => setConvertingLead({...convertingLead, booking_date: e.target.value})}/>
+                   <input type="date" className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.booking_date || ''} onChange={e => setConvertingLead((prev: any) => ({...prev, booking_date: e.target.value}))}/>
                  </div>
                  <div>
                    <label className="text-xs font-semibold text-gray-500 uppercase">Expected Payment</label>
-                   <input type="number" className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.expected_payment || ''} onChange={e => setConvertingLead({...convertingLead, expected_payment: e.target.value})}/>
+                   <input type="number" className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.expected_payment || ''} onChange={e => setConvertingLead((prev: any) => ({...prev, expected_payment: e.target.value}))}/>
                  </div>
                </div>
                <div className="grid grid-cols-2 gap-4">
                  <div>
                    <label className="text-xs font-semibold text-gray-500 uppercase">Room</label>
-                   <select className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.room_id || ''} onChange={e => setConvertingLead({...convertingLead, room_id: e.target.value})}>
+                   <select className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.room_id || ''} onChange={e => setConvertingLead((prev: any) => ({...prev, room_id: e.target.value}))}>
                      <option value="">-- None --</option>
                      {roomOptions}
                    </select>
                  </div>
                  <div>
                    <label className="text-xs font-semibold text-gray-500 uppercase">Package</label>
-                   <select className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.package_id || ''} onChange={e => setConvertingLead({...convertingLead, package_id: e.target.value})}>
+                   <select className="w-full border rounded px-3 py-1.5 mt-1 text-sm bg-gray-50" value={convertingLead.package_id || ''} onChange={e => setConvertingLead((prev: any) => ({...prev, package_id: e.target.value}))}>
                      <option value="">-- None --</option>
                      {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                    </select>
@@ -585,7 +595,7 @@ export default function LeadsPage() {
                       </div>
                     ) : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">₹{lead.expected_payment}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">₹{Number(lead.expected_payment || 0).toLocaleString()}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${lead.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : lead.status === 'Converted' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {lead.status}

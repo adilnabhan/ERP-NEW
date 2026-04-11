@@ -55,8 +55,7 @@ export default function PatientsPage() {
     const [pRes, dRes, rRes, tRes, pkgRes, prcRes] = await Promise.all([
       supabase
         .from("patients")
-        .select("*, doctors(name), rooms(room_number), billing(*)")
-        .order("created_at", { ascending: false }),
+        .select("*, doctors(name), rooms(room_number), billing(*)"),
       supabase.from("doctors").select("*"),
       supabase.from("rooms").select("*"),
       supabase.from("treatment_catalog").select("*"),
@@ -89,11 +88,13 @@ export default function PatientsPage() {
     return priceCol && priceRow[priceCol] ? Number(priceRow[priceCol]) : null;
   }
 
-  const filteredPatients = patients.filter(
+  const filteredPatients = searchPhone.trim().length === 0 ? [] : patients.filter(
     (p) =>
       p.contact?.includes(searchPhone) ||
-      p.name?.toLowerCase().includes(searchPhone.toLowerCase()),
-  );
+      p.name?.toLowerCase().includes(searchPhone.toLowerCase()) ||
+      (p.patient_id && `P-${p.patient_id}`.toLowerCase().includes(searchPhone.toLowerCase())) ||
+      (p.patient_id && String(p.patient_id).includes(searchPhone)),
+  ).sort((a: any, b: any) => (b.patient_id || 0) - (a.patient_id || 0));
 
   async function saveNewPatient() {
     if (!form.name || !form.contact)
@@ -117,6 +118,7 @@ export default function PatientsPage() {
             doctor_id: form.doctor_id || null,
             room_id: form.room_id || null,
             status: "Admitted",
+            expected_discharge_date: form.expected_discharge_date || null,
           },
         ])
         .select()
@@ -517,7 +519,7 @@ export default function PatientsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by Phone/Name"
+              placeholder="Search by ID, Name, or Phone"
               className="pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:ring-gray-900 focus:border-gray-900 outline-none text-sm w-64 shadow-sm"
               value={searchPhone}
               onChange={(e) => setSearchPhone(e.target.value)}
@@ -682,18 +684,33 @@ export default function PatientsPage() {
                 </select>
                 <select
                   className="w-1/2 border-gray-300 border rounded-md px-3 py-2 text-sm focus:border-indigo-500 outline-none transition-colors shadow-sm bg-white"
-                  onChange={(e) =>
-                    setForm((prev: any) => ({ ...prev, package_id: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    const pkgId = e.target.value;
+                    const pkg = packages.find((p: any) => String(p.id) === String(pkgId));
+                    const admDate = new Date();
+                    let dischargeDate = '';
+                    if (pkg && pkg.duration_days) {
+                      const d = new Date(admDate);
+                      d.setDate(d.getDate() + pkg.duration_days);
+                      dischargeDate = d.toISOString().split('T')[0];
+                    }
+                    setForm((prev: any) => ({ ...prev, package_id: pkgId, expected_discharge_date: dischargeDate }));
+                  }}
                 >
                   <option value="">-- Package --</option>
                   {packages.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {p.name} ({p.duration_days || '?'}d)
                     </option>
                   ))}
                 </select>
               </div>
+              {form.expected_discharge_date && (
+                <div className="mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-md">
+                  <span className="text-xs font-semibold text-indigo-600 uppercase">Expected Discharge: </span>
+                  <span className="text-sm font-bold text-indigo-800">{new Date(form.expected_discharge_date + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'})}</span>
+                </div>
+              )}
             </div>
           </div>
           <div className="mt-5 flex justify-end">
@@ -726,6 +743,11 @@ export default function PatientsPage() {
                     selectedPatient.name
                   )}
                 </h2>
+                {selectedPatient.patient_id && (
+                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-700">
+                    P-{selectedPatient.patient_id}
+                  </span>
+                )}
                 {!isEditingPatient && (
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${selectedPatient.status === "Discharged" ? "bg-gray-200 text-gray-700" : "bg-green-100 text-green-700"}`}
@@ -1191,25 +1213,37 @@ export default function PatientsPage() {
             </div>
           </div>
         </div>
+      ) : searchPhone.trim().length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <Search className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-500 mb-2">Search for a Patient</h3>
+          <p className="text-sm text-gray-400">Type a Patient ID (e.g. P-1000), name, or phone number above to find patient records.</p>
+        </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Patient Name
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Contact Details
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Contact
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Assigned
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Admission
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Paid / Status
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Discharge
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Status
                 </th>
               </tr>
             </thead>
@@ -1220,50 +1254,50 @@ export default function PatientsPage() {
                   className="hover:bg-blue-50/50 cursor-pointer transition-colors"
                   onClick={() => openPatientDetails(patient)}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-700">
+                      P-{patient.patient_id || '—'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                        <User className="h-5 w-5 text-indigo-600" />
+                      <div className="flex-shrink-0 h-9 w-9 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <User className="h-4 w-4 text-indigo-600" />
                       </div>
-                      <div className="ml-4">
+                      <div className="ml-3">
                         <div className="text-sm font-bold text-gray-900">
                           {patient.name}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Age: {patient.age || "N/A"} •{" "}
-                          {patient.blood_group || "No BG"}
+                          Age: {patient.age || "N/A"} • {patient.blood_group || "No BG"}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-800">
                       {patient.contact}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {patient.aadhar ? `Aadhar: ${patient.aadhar}` : ""}
-                    </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
                       {patient.doctors?.name || "-"}
                     </div>
                     <div className="text-xs text-indigo-600 font-medium">
-                      {patient.rooms?.room_number
-                        ? `Room: ${patient.rooms.room_number}`
-                        : ""}
+                      {patient.rooms?.room_number ? `Room ${patient.rooms.room_number}` : ""}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <Calendar className="w-3 h-3 mr-1" />{" "}
-                      {new Date(patient.admission_date).toLocaleDateString()}
-                    </div>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                    {patient.admission_date ? new Date(patient.admission_date).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-bold text-green-600 mb-1">
-                      ₹{patient.billing?.[0]?.total_paid || 0} Paid
-                    </div>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    {patient.expected_discharge_date ? (
+                      <span className="text-orange-700 font-semibold">{new Date(patient.expected_discharge_date + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short'})}</span>
+                    ) : patient.discharge_date ? (
+                      <span className="text-gray-500">{new Date(patient.discharge_date).toLocaleDateString('en-IN', {day:'numeric',month:'short'})}</span>
+                    ) : '—'}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-right">
                     <span
                       className={`px-2 inline-flex text-[10px] leading-5 font-bold uppercase tracking-wider rounded-md ${patient.status === "Discharged" ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-700"}`}
                     >
@@ -1275,10 +1309,10 @@ export default function PatientsPage() {
               {filteredPatients.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="px-6 py-10 text-center text-gray-500 italic"
                   >
-                    No patients matched this search criteria.
+                    No patients matched &quot;{searchPhone}&quot;
                   </td>
                 </tr>
               )}

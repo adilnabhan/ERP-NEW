@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Home, Users, Bed, CreditCard, Stethoscope, Briefcase, Pill, PhoneCall, LogOut, FileText, Menu, X, Library } from 'lucide-react';
+import { Home, Users, Bed, CreditCard, Stethoscope, Briefcase, Pill, PhoneCall, LogOut, FileText, Menu, X, Library, CalendarCheck } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Leads (Enquiries)', href: '/leads', icon: PhoneCall },
+  { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
   { name: 'Patients', href: '/patients', icon: Users },
   { name: 'Discharged Record', href: '/discharged', icon: FileText },
   { name: 'Packages', href: '/packages', icon: Library },
