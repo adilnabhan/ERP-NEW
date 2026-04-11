@@ -16,7 +16,7 @@ function createWindow() {
   })
 
   // Load the live Vercel app
-  mainWindow.loadURL('https://erp-new-gold.vercel.app/')
+  mainWindow.loadURL('https://erp-new-eight.vercel.app/')
 
   mainWindow.on('closed', () => {
     mainWindow = null
