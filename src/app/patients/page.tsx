@@ -18,6 +18,7 @@ import {
   Trash2,
   Save,
 } from "lucide-react";
+import RoomAvailabilityModal from "@/components/RoomAvailabilityModal";
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<any[]>([]);
@@ -28,6 +29,7 @@ export default function PatientsPage() {
   const [searchPhone, setSearchPhone] = useState("");
 
   const [isAddingMode, setIsAddingMode] = useState(false);
+  const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
   const [form, setForm] = useState<any>({});
 
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
@@ -574,6 +576,12 @@ export default function PatientsPage() {
             <Plus className="w-4 h-4 mr-2" /> New Patient
           </button>
           <button
+            onClick={() => setIsAvailabilityOpen(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium"
+          >
+            <Calendar className="w-4 h-4 mr-2" /> Availability Search
+          </button>
+          <button
             onClick={downloadCSV}
             className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm text-sm font-medium"
           >
@@ -581,6 +589,8 @@ export default function PatientsPage() {
           </button>
         </div>
       </div>
+
+      <RoomAvailabilityModal isOpen={isAvailabilityOpen} onClose={() => setIsAvailabilityOpen(false)} />
 
       {isAddingMode && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">

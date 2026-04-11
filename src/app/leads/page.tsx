@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, X, Check, Phone, Calendar, BedDouble, AlertTriangle, Edit2, Trash2 } from 'lucide-react';
+import RoomAvailabilityModal from '@/components/RoomAvailabilityModal';
 
 interface Room {
   id: string;
@@ -35,6 +36,7 @@ export default function LeadsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
   const [newLead, setNewLead] = useState<Partial<Lead>>(emptyForm);
   const [availabilityWarning, setAvailabilityWarning] = useState('');
 
@@ -361,13 +363,23 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900">Leads & Enquiries</h1>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="flex items-center px-3 py-2 md:px-4 md:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm"
-        >
-          <Plus className="w-4 h-4 mr-1 md:mr-2" /> New Enquiry
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsAvailabilityOpen(true)}
+            className="flex items-center px-3 py-2 md:px-4 md:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+          >
+            <Calendar className="w-4 h-4 mr-1 md:mr-2" /> Availability Search
+          </button>
+          <button
+            onClick={() => setIsAdding(true)}
+            className="flex items-center px-3 py-2 md:px-4 md:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4 mr-1 md:mr-2" /> New Enquiry
+          </button>
+        </div>
       </div>
+
+      <RoomAvailabilityModal isOpen={isAvailabilityOpen} onClose={() => setIsAvailabilityOpen(false)} />
 
       {/* ADD FORM */}
       {isAdding && (
