@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, X, Check, Search, Calendar, BedDouble, AlertTriangle, Phone, User, CreditCard, Trash2, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import RoomAvailabilityModal from '@/components/RoomAvailabilityModal';
 
 interface Booking {
   id: string;
@@ -33,6 +34,7 @@ export default function BookingsPage() {
   const [prices, setPrices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
   const [form, setForm] = useState<any>({});
   const [availabilityWarning, setAvailabilityWarning] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -346,13 +348,23 @@ export default function BookingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900">Bookings</h1>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="flex items-center px-3 py-2 md:px-4 md:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
-        >
-          <Plus className="w-4 h-4 mr-1 md:mr-2" /> New Booking
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsAvailabilityOpen(true)}
+            className="flex items-center px-3 py-2 md:px-4 md:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            <Calendar className="w-4 h-4 mr-1 md:mr-2" /> Availability Search
+          </button>
+          <button
+            onClick={() => setIsAdding(true)}
+            className="flex items-center px-3 py-2 md:px-4 md:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+          >
+            <Plus className="w-4 h-4 mr-1 md:mr-2" /> New Booking
+          </button>
+        </div>
       </div>
+
+      <RoomAvailabilityModal isOpen={isAvailabilityOpen} onClose={() => setIsAvailabilityOpen(false)} />
 
       {/* FILTER CONTROLS */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
